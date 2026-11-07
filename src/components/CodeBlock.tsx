@@ -1,3 +1,4 @@
+// Code-block frame adapted from T3 Code, Copyright (c) 2026 T3 Tools Inc., MIT licensed.
 // Security: Shiki's output is generator-escaped; nothing else reaches the DOM as HTML.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { HighlighterCore } from "shiki/core";
@@ -6,7 +7,6 @@ import { Check, Copy, Download, MoreHorizontal, WrapText, X } from "lucide-react
 import { cn } from "@/lib/cn";
 import { useCopyFeedback } from "@/lib/copy-text";
 import { t } from "@/lib/i18n";
-import { useAdvancedMode } from "@/lib/interface-mode";
 import { useNearScreen } from "@/lib/on-screen";
 import { countLines, downloadSnippetFile, formatLineCount, getLanguageDisplayName, getSnippetFileName } from "../lib/code-block";
 import { SidebarPopoverMenu, type SidebarMenuItem } from "./SidebarPopoverMenu";
@@ -196,7 +196,6 @@ export function CodePlate({ copied, onCopy, copyLabel, items }: {
 }
 
 export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
-  const simple = !useAdvancedMode();
   const frame = useRef<HTMLDivElement>(null);
   // A long chat can hold dozens of blocks: coloured ones are thousands of spans to style and lay out on every switch,
   // so a block is coloured only once it comes near the screen.
@@ -251,28 +250,16 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
     </pre>
   );
 
-  if (simple) {
-    return (
-      <div ref={frame} dir="ltr" className="chat-code-block group/code relative my-2.5 overflow-hidden rounded-lg bg-ink/[0.04]">
-        <CodePlate copied={copied} onCopy={copy} copyLabel={t("code.copyTitle")} items={[
-          { key: "wrap", label: t("code.wrapLines"), icon: <WrapText size={14} aria-hidden="true" />, active: wrapLines, onSelect: () => setWrapLines((wrap) => !wrap) },
-          { key: "save", label: t("code.saveAsFile"), icon: <Download size={14} aria-hidden="true" />, onSelect: download },
-          { key: "about", label: t("code.caption", { language: displayLanguage, lines: formatLineCount(lineCount) }), disabled: true, separatorBefore: true, onSelect: () => {} },
-        ]} />
-        {body("leading-5 [&_pre]:px-3 [&_pre]:py-2", "text-ink-secondary")}
-      </div>
-    );
-  }
 
   return (
-    <div ref={frame} dir="ltr" className="chat-code-block my-2 overflow-hidden rounded-lg border border-hairline/40 bg-inset">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline/30 bg-raised/30 px-3 py-1.5 text-xs">
+    <div ref={frame} dir="ltr" className="chat-code-block response-code-frame my-[0.65rem] overflow-hidden rounded-lg border border-hairline/70 bg-inset/40 text-start leading-snug">
+      <div className="response-code-header flex flex-wrap items-center justify-between gap-2 pt-1.5 pe-1.5 pb-0 ps-3 text-xs text-ink-secondary select-none">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span title={displayLanguage} className="min-w-0 truncate rounded border border-hairline/40 bg-raised px-1.5 py-0.5 text-[11px] font-medium tracking-wide text-ink select-none">
+          <span title={displayLanguage} className="min-w-0 truncate font-mono text-[11px]">
             {displayLanguage}
           </span>
           {lineCount > 0 && (
-            <span className="shrink-0 whitespace-nowrap text-[11px] text-ink-secondary select-none">
+            <span className="sr-only">
               {formatLineCount(lineCount)}
             </span>
           )}
@@ -291,7 +278,7 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
             aria-pressed={wrapLines}
           >
             <WrapText size={12} aria-hidden="true" />
-            <span>{wrapLines ? t("code.unwrap") : t("code.wrap")}</span>
+            <span className="hidden max-sm:inline touch:inline">{wrapLines ? t("code.unwrap") : t("code.wrap")}</span>
           </button>
           <button
             type="button"
@@ -301,7 +288,7 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
             aria-label={t("code.saveTitle")}
           >
             <Download size={12} aria-hidden="true" />
-            <span>{t("code.save")}</span>
+            <span className="hidden max-sm:inline touch:inline">{t("code.save")}</span>
           </button>
           <button
             type="button"
@@ -314,7 +301,7 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
               : copied === "copied" ? <Check size={12} className="text-success" aria-hidden="true" />
                 : <Copy size={12} aria-hidden="true" />}
             <span aria-hidden="true" className="hidden max-sm:inline touch:inline">{t("code.copy")}</span>
-            <span role="status" className={`max-sm:sr-only touch:sr-only ${copied === "failed" ? "text-danger font-medium" : copied === "copied" ? "text-success font-medium" : ""}`}>
+            <span role="status" className="sr-only">
               {copied === "failed" ? t("common.copyFailed") : copied === "copied" ? t("code.copied") : t("code.copy")}
             </span>
           </button>

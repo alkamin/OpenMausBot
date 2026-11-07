@@ -28,7 +28,7 @@ import { CompactionChip, DigestChip } from "./DigestChip";
 import { roomActivityVisible } from "@/lib/room-activity";
 import { StatusActivityRow } from "@/components/StatusActivityRow"; import { BugReportNote } from "@/components/BugReportNote";
 import { normalizeState } from "@/lib/mascot";
-import { botTextShowsSpeaker, laterTextOwns, runShowsSpeaker } from "@/lib/room-speaker";
+import { laterTextOwns, runShowsSpeaker } from "@/lib/room-speaker";
 import { defaultResponderName, groupResponseHint, jevRoomRoutingOn } from "@/lib/group-routing";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { FailedTurnRow, MessageBoundary } from "./ChatView";
@@ -38,6 +38,7 @@ import { useAdvancedMode } from "@/lib/interface-mode";
 import { CopyButton, MESSAGE_ROW, MessageActions, messageActionClass, ReplyAction } from "./MessageActions";
 import { ReactAction, ReactionChips, useCanReact } from "./Reactions";
 import { ClusterLabel } from "./RoomClusterLabel";
+import { isConversational } from "../../shared/reply-style";
 import { roomPin, useBotMessageMenu, userMessageMenu } from "./message-menu";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
 import { SpeakButton } from "./SpeakButton";
@@ -184,7 +185,8 @@ function RoomTextMessage({
     pin,
   });
   const replyGroup = useMemo(() => !user && botText.trim() ? replyAttachmentGroup(botText, m.attachments) : null, [user, botText, m.attachments]);
-  const blocks = useMemo(() => simple && !user && !viewRaw && botText.trim() ? splitReplyBlocks(botText) : null, [simple, user, viewRaw, botText]);
+  const conversational = isConversational(speakerBot?.replyStyle);
+  const blocks = useMemo(() => simple && conversational && !user && !viewRaw && botText.trim() ? splitReplyBlocks(botText) : null, [simple, conversational, user, viewRaw, botText]);
   const tabled = Boolean(blocks?.some((block) => block.kind === "table"));
   const botActions = !user && (
     <MessageActions side="bot" forceOpen={viewRaw || speaking} menu={botMenu}>
@@ -197,6 +199,7 @@ function RoomTextMessage({
   );
   return (
     <div {...{ [MESSAGE_ROW]: "" }} className={cn("group flex w-full flex-col", user ? "items-end" : "items-start")}>
+      {!user && <ClusterLabel bot={speakerBot} name={m.from?.name ?? t("room.fallbackBot")} color={m.from?.color ?? "blue"} />}
       {speaker && <div className="mb-0.5 px-1 text-[12px] font-medium text-ink-secondary">{speaker}</div>}
       <div className={cn("flex w-full items-end gap-1.5", user ? "justify-end" : "justify-start")}>
         {user && (
@@ -213,7 +216,7 @@ function RoomTextMessage({
             !user && emerging && "turn-answer",
             tabled || (!user && !m.text?.trim() && !m.replyToId && m.attachments?.length)
               ? "text-ink"
-              : !simple && !user && isFormattedReply(m.text ?? "")
+              : !user && (!conversational || isFormattedReply(m.text ?? ""))
                 ? cn(formattedReplyWidth(m.text ?? ""), "px-1 text-ink")
                 : user
                   ? cn("chat-text whitespace-pre-wrap [overflow-wrap:anywhere] text-ink", simple ? SIMPLE_USER_BUBBLE : "bg-bubble-user px-4 py-2.5")
@@ -479,18 +482,15 @@ export const Transcript = memo(function Transcript({
         if (!row) return divider && <div key={m.id} className="contents">{divider}</div>;
         const fold = folds.byTerminalId.get(m.id);
         return (
-          <div key={m.id} className="contents" data-mid={m.id}>
+          <div key={m.id} className="contents" data-mid={m.id} data-user-turn={user && prev?.role === "bot" ? "" : undefined}>
             {newDay && (
               <div className="py-3 text-center text-[13px] text-ink-secondary">
                 {dayLabel(m.at)} {formatTime(m.at)}
               </div>
             )}
             {divider}
-            {m.from && (
-              (m.kind === "text" && botTextShowsSpeaker(items, i))
-              || (!user && m.kind !== "text" && newCluster && !(m.kind === "activity" && m.comm) && !laterTextOwns(items, i, m.from.botId, m.at))
-            ) && (
-              <ClusterLabel bot={memberOf(m.from.botId)} name={m.from.name} color={m.from.color} />
+            {m.from && !user && m.kind !== "text" && newCluster && !(m.kind === "activity" && m.comm) && !laterTextOwns(items, i, m.from.botId, m.at) && (
+              <ClusterLabel bot={memberOf(m.from.botId)} name={m.from.name} color={m.from.color} className="-mb-4" />
             )}
             {fold && (
               <TurnNarrationRun
@@ -1095,7 +1095,7 @@ export function GroupView({ group }: { group: Group }) {
         ) : (
         <div
           ref={transcriptRef}
-          className="glass-scroller-content chat-column relative flex w-full flex-col gap-3"
+          className="glass-scroller-content chat-column relative flex w-full flex-col gap-12"
           style={{ paddingBottom: composerDock.pad }}
           role="log"
           aria-live="off"

@@ -7,6 +7,7 @@ import type { Notification } from "../../shared/notification.ts";
 import type { PersonWait } from "../../shared/person-wait.ts";
 import type { OptionCardData } from "../../shared/wire.ts";
 import type { RequestAuth } from "../request-auth.ts";
+import type { Message, StoreChange } from "../store.ts";
 import { createPlaceInbox, PLACE_MESSAGES_HOURLY, placeInboxViewer, type InboxViewer, type OpenCardRow, type PlaceInboxDeps } from "./place-inbox.ts";
 
 const OWNER = { kind: "owner-session" } as unknown as RequestAuth;
@@ -17,7 +18,7 @@ const viewers = new Map<RequestAuth, InboxViewer>([[OWNER, { kind: "owner" }], [
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
-type Said = { id: string; at: number; role: string; peerAsk?: boolean; relayed?: boolean; via?: string; text?: string; inbox?: unknown };
+type Said = { id: string; at: number; role: string; peerAsk?: Message["peerAsk"]; relayed?: boolean; via?: string; text?: string; inbox?: unknown };
 
 function setup(over: Partial<PlaceInboxDeps> = {}, dataDir = mkdtempSync(join(tmpdir(), "place-inbox-"))) {
   dirs.push(dataDir);
@@ -32,8 +33,9 @@ function setup(over: Partial<PlaceInboxDeps> = {}, dataDir = mkdtempSync(join(tm
     eli: { id: "eli", name: "Eli", threadId: "eli-main", color: "blue" }, mira: { id: "mira", name: "Mira", threadId: "mira-main", color: "red" },
   };
   const titles: Record<string, string> = { "eli-main": "Eli", "eli-pricing": "Pricing work", "eli-launch": "Launch work", "guest-chat": "Guest chat" };
-  const listeners: Array<(change: { type: string; threadId: string }) => void> = [];
+  const listeners: Array<(change: StoreChange) => void> = [];
   const store = {
+    bots: Object.values(bots),
     bot: (id: string) => bots[id],
     botByThread: (threadId: string) => (threadId.startsWith("eli") || threadId === "guest-chat" ? bots.eli : threadId.startsWith("mira") ? bots.mira : undefined),
     taskByThread: (_botId: string, threadId: string) => (titles[threadId] ? { threadId, title: titles[threadId] } : undefined),
@@ -45,7 +47,8 @@ function setup(over: Partial<PlaceInboxDeps> = {}, dataDir = mkdtempSync(join(tm
     },
     patchTask: () => undefined, patchGroup: () => undefined,
     messagesFor: (threadId: string) => said.get(threadId) ?? [],
-    onChange: (listener: (change: { type: string; threadId: string }) => void) => { listeners.push(listener); return () => undefined; },
+    activePath: (threadId: string) => said.get(threadId) ?? [],
+    onChange: (listener: (change: StoreChange) => void) => { listeners.push(listener); return () => undefined; },
   };
   const inbox = createPlaceInbox({
     dataDir, store: store as unknown as PlaceInboxDeps["store"], openCards: () => cards,
@@ -191,19 +194,13 @@ describe("the inbox of a place that is no team's", () => {
     expect(f.inbox.message("nobody", "eli-main", "hi").status).toBe(403);
   });
 
-  it("counts news until it is read, and a routine's report notifies only through the notification it came with", () => {
+  it("leaves routine reports out of the inbox and its count", () => {
     const f = setup();
     const note: Notification = { kind: "done", botId: "eli", botName: "Eli", threadId: "eli-main", title: "Daily digest", body: "3 new leads" };
     expect(f.inbox.route(note, { routine: true })).toBe(note);
     expect(f.sent).toEqual([]);
-    const [row] = f.inbox.view(OWNER).rows;
-    expect(row).toMatchObject({ kind: "result", text: "3 new leads", tab: "info", unread: true });
-    expect(row!.replies).toBeUndefined();
-    expect(f.inbox.count(OWNER)).toBe(1);
-    expect(f.inbox.markRead(OWNER, row!.id)).toBe(true);
+    expect(f.inbox.view(OWNER).rows).toEqual([]);
     expect(f.inbox.count(OWNER)).toBe(0);
-    expect(f.inbox.markDone(OWNER, row!.id)).toBe("done");
-    expect(f.inbox.view(OWNER).rows[0]!.tab).toBe("done");
   });
 
   it("gives a line to nothing the person is sitting in front of: a chat's own finish and own failure stay out", () => {
@@ -215,7 +212,7 @@ describe("the inbox of a place that is no team's", () => {
     f.inbox.route({ kind: "routine-failed", botId: "eli", botName: "Eli", threadId: "eli-main", title: "Failed", body: "It broke" }, { routine: true });
     f.handed.set("eli-pricing", "mira");
     f.inbox.route({ kind: "turn-failed", botId: "eli", botName: "Eli", threadId: "eli-pricing", title: "Failed", body: "Handed work broke" });
-    expect(f.inbox.view(OWNER).rows.map((row) => [row.kind, row.text])).toEqual(expect.arrayContaining([["notice", "It broke"], ["notice", "Handed work broke"]]));
+    expect(f.inbox.view(OWNER).rows).toEqual([]);
   });
 
   it("reads an ask as seen without settling it: it still counts, and only its answer closes it", () => {
@@ -251,6 +248,42 @@ describe("the inbox of a place that is no team's", () => {
     f.inbox.message("eli", "eli-main", "News");
     const again = setup({ openCards: () => f.cards, store: f.store as unknown as PlaceInboxDeps["store"], now: () => 2_000 }, f.dataDir);
     expect(again.inbox.view(OWNER).rows.map((row) => [row.kind, row.unread])).toEqual(expect.arrayContaining([["ask", false], ["message", true]]));
+  });
+
+  it("lists a settled tag once, links its original message, and settles it when the person replies", () => {
+    const f = setup({ profileName: () => "Alex" });
+    const reply = { id: "tagged", at: 900, role: "bot", kind: "text", text: "@Alex please review the pricing.", turnId: "t1", turnSucceeded: true } as Message;
+    f.said.set("eli-pricing", [reply]);
+    const change = { type: "message.patch", threadId: "eli-pricing", message: reply } as const;
+    for (let repeat = 0; repeat < 2; repeat++) for (const listener of f.listeners) listener(change);
+    expect(f.inbox.view(OWNER).rows).toEqual([expect.objectContaining({ id: "tagged", kind: "message", replies: true, text: reply.text, origin: expect.objectContaining({ threadId: "eli-pricing", messageId: "tagged" }) })]);
+    expect(f.sent).toHaveLength(1);
+    expect(f.inbox.count(OWNER)).toBe(1);
+    f.store.appendMessage("eli-pricing", { role: "user", text: "Looks good" });
+    expect(f.inbox.count(OWNER)).toBe(0);
+    expect(f.inbox.view(OWNER).rows[0]!.tab).toBe("done");
+  });
+
+  it.each(["All done", "`@you` in code", "```\n@you please review\n```", "email@you.test"])("ignores an untagged reply: %s", (text) => {
+    const f = setup();
+    const reply = { id: "quiet", at: 900, role: "bot", kind: "text", text, turnId: "t1", turnSucceeded: true } as Message;
+    f.said.set("eli-main", [reply]);
+    for (const listener of f.listeners) listener({ type: "message.patch", threadId: "eli-main", message: reply });
+    expect(f.inbox.view(OWNER).rows).toEqual([]);
+    expect(f.sent).toEqual([]);
+  });
+
+  it("keeps failed tags out and lists muted tags without notifying", () => {
+    const f = setup();
+    f.bots.eli!.notifications = false;
+    const reply = { id: "muted", at: 900, role: "bot", kind: "text", text: "@you please review the page.", turnId: "t1", turnSucceeded: false } as Message;
+    f.said.set("eli-main", [reply]);
+    for (const listener of f.listeners) listener({ type: "message.patch", threadId: "eli-main", message: reply });
+    expect(f.inbox.view(OWNER).rows).toEqual([]);
+    reply.turnSucceeded = true;
+    for (const listener of f.listeners) listener({ type: "message.patch", threadId: "eli-main", message: reply });
+    expect(f.inbox.count(OWNER)).toBe(1);
+    expect(f.sent).toEqual([]);
   });
 
   describe("on a Cloud with a guest", () => {

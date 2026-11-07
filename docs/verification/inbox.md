@@ -6,7 +6,10 @@
 2. A bot's approval and question, in two threads at once, are listed with count 2, each labelled with its thread.
 3. An answer through the row's own conversation reaches the bot, its turn goes on and the count clears. A second answer to
    the same card is refused.
-4. `message_person` arrives as one line, one row and one notification, and a reply reaches the bot.
+4. `@you` in a settled bot reply puts its original message in the inbox once, in both direct chats and channels, with one
+   mention notification. A reply reaches the original chat and clears the item. Ordinary updates and code examples stay out.
+5. The model's actual system prompt teaches `@you` for a specific answer, decision or action.
+6. `message_person`, an explicit message addressed to the person, arrives as one line, one row and one notification, and a reply reaches the bot.
 
 On My Cloud it also checks that nobody connects as a guest, that a bot's shell reads nothing, and that a guest's conversation
 left behind reaches the owner labelled, with its news kept away.
@@ -26,6 +29,12 @@ by its own card kind and answered with the chat's own card for it.
 ```sh
 pnpm exec vitest run src/components/inbox/InboxReading.dom.test.ts src/components/inbox/InboxPanel.dom.test.ts src/components/inbox/InboxEverywhere.dom.test.ts
 ```
+
+The panel and its badge include tags, directly addressed messages and open cards. Routine reports, unrelated team issues,
+and active conversations stay out. Active Threads has its own sidebar control. The view also filters reports saved by an
+older server. `server/host/place-inbox.test.ts` and `server/host/person-inbox.test.ts` cover the server's matching list and
+counts; `server/host/team-messages.test.ts` checks that a team's `@you` reaches the person who asked, even when another
+person writes during the turn.
 
 ## The rail, in a real build
 

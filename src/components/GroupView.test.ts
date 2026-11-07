@@ -46,9 +46,10 @@ describe("RoomToolChip", () => {
     expect(markup).toContain('title="Open #QA PR 245"');
   });
 
-  it("leaves an ordinary step as a plain pill", () => {
+  it("keeps an ordinary step expandable with a copyable input", () => {
     const markup = render(chip());
-    expect(markup).not.toContain("<button");
+    expect(markup).toContain("<summary");
+    expect(markup).toContain('aria-label="Copy Input"');
     expect(markup).toContain("Posted in Standup");
   });
 

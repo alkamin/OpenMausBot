@@ -20,8 +20,10 @@ function skin(id: string): Record<string, string> {
 }
 
 describe("room speaker colors", () => {
-  it("gives chat text a taller line box without changing the type size", () => {
-    expect(css).toMatch(/\.chat-text,\s*\.chat-md\s*\{\s*line-height:\s*1\.75;/);
+  it("keeps plain chat text tall and gives Markdown its own reading rhythm", () => {
+    expect(css).toMatch(/\.chat-text\s*\{\s*line-height:\s*1\.75;/);
+    const responseCss = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../t3-response.css"), "utf8");
+    expect(responseCss).toContain("line-height: 1.625;");
   });
 
   it("names each bot with a class that reads the skin token", () => {

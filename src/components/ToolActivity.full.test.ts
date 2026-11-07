@@ -25,6 +25,26 @@ const toggle = async (open: boolean) => {
 const shown = () => [...host.querySelectorAll("pre")].at(-1)?.textContent;
 
 describe("ToolActivity: a clipped step", () => {
+  it("formats JSON for reading while copying the original result exactly", async () => {
+    const original = '{"seats":4,"verified":true}';
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    try {
+      render({ output: original });
+      await toggle(true);
+      expect(shown()).toBe(JSON.stringify(JSON.parse(original), null, 2));
+      const copy = host.querySelector<HTMLButtonElement>('button[aria-label="Copy Result"]')!;
+      await act(async () => copy.click());
+      expect(writeText).toHaveBeenCalledWith(original);
+      expect(copy.getAttribute("aria-label")).toBe("Copied");
+      expect([...host.querySelectorAll('[role="status"]')].some((node) => node.textContent === "Copied")).toBe(true);
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, "clipboard", descriptor);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+
   it("loads its whole output once, when first opened", async () => {
     api.mockResolvedValue({ output: whole });
     render({ output: preview, clipped: true });

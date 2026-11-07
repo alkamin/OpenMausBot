@@ -4,6 +4,7 @@ const BLOCK_MARKDOWN = [
   /^ {0,3}#{1,6} \S/m,
   /^ {0,3}(?:```|~~~)/m,
   /^ {0,3}> ?\S/m,
+  /^ {0,3}<details(?:\s+open)?\s*>/im,
   TABLE_DIVIDER,
 ];
 
@@ -44,11 +45,16 @@ export function splitReplyBlocks(text: string): ReplyBlock[] {
   };
   let prose: string[] = [];
   let fence: string | null = null;
+  let detailsDepth = 0;
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]!;
     const marker = FENCE.exec(line)?.[1];
     if (marker && (!fence || marker === fence)) fence = fence ? null : marker;
-    if (fence || marker || !PIPE_ROW.test(line) || !DELIMITER_ROW.test(lines[index + 1] ?? "")) {
+    if (!fence && !marker) {
+      if (/^ {0,3}<details(?:\s+open)?\s*>/i.test(line)) detailsDepth++;
+      if (/^ {0,3}<\/details>\s*$/i.test(line)) detailsDepth = Math.max(0, detailsDepth - 1);
+    }
+    if (fence || marker || detailsDepth > 0 || !PIPE_ROW.test(line) || !DELIMITER_ROW.test(lines[index + 1] ?? "")) {
       prose.push(line);
       continue;
     }

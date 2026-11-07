@@ -363,6 +363,16 @@ pnpm package:win      # Windows: installer + ZIP
 pnpm package:linux    # Ubuntu x64: .deb + AppImage + verified CUA runtime
 ```
 
+For repeated local macOS installs, use `pnpm package:mac:local`. It creates a
+persistent local signing certificate on first use, builds this Mac's architecture,
+and signs the app and its helpers with that same certificate on every build.
+Install the resulting `release/local/mac-arm64/OpenMausBot.app` (Apple silicon)
+or `release/local/mac/OpenMausBot.app` (Intel) at `/Applications/OpenMausBot.app`.
+The first switch from a release or ad-hoc build needs fresh privacy approvals;
+later local rebuilds keep the same signing identity. See
+[local macOS signing](docs/verification/mac-local-signing.md) for verification and
+certificate storage. Use `package:mac` for distribution builds.
+
 ### Desktop capability status
 
 | Capability | macOS | Ubuntu 24.04 Xorg | Ubuntu 24.04 Wayland |

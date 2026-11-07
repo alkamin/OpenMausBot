@@ -1,6 +1,9 @@
+import { installMacQuitDock } from "./mac-quit-dock.mjs";
+
 // The splash can be destroyed mid-boot: during startup an empty window set means boot is still working, not quit.
 // `stayOpen()`: the app started at login out of sight, so it runs with no window until the person opens one.
 export function createAllWindowsClosedQuit({ app, platform = process.platform, allWindows, stayOpen = () => false }) {
+  installMacQuitDock({ app, platform });
   let startupSettled = false;
   const maybeQuit = () => {
     if (platform === "darwin" || !startupSettled || stayOpen()) return;

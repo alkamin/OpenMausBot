@@ -15,30 +15,37 @@ const bot: Bot = {
 };
 
 describe("delete all threads", () => {
-  it("covers every thread except routine runs, with the open thread's running state", () => {
+  it("includes hidden routine runs and pinned threads, with the open thread's running state", () => {
     const rows = allThreadRows({ ...bot, busy: true, activity: "working" });
-    expect(rows.map((row) => row.threadId)).toEqual(["open", "pinned"]);
+    expect(rows.map((row) => row.threadId)).toEqual(["open", "pinned", "run"]);
     expect(rows.find((row) => row.threadId === "open")).toMatchObject({ busy: true, activity: "working" });
   });
 
   it("says a new empty conversation starts only when nothing is running, and counts pinned threads", () => {
     const idle = deleteAllThreadsCopy(allThreadRows(bot));
-    expect(idle.title).toBe("Delete all threads (2)?");
-    expect(idle.confirmLabel).toBe("Delete 2");
+    expect(idle.title).toBe("Delete all threads (3)?");
+    expect(idle.confirmLabel).toBe("Delete 3");
     expect(idle.body).toContain("Pinned threads included: 1.");
     expect(idle.body).toContain("a new empty conversation will be started");
     const running = deleteAllThreadsCopy(allThreadRows({ ...bot, busy: true, activity: "working" }));
     expect(running.body).not.toContain("a new empty conversation will be started");
   });
 
+  it("does not promise a fresh conversation when a hidden routine run is working", () => {
+    const running = { ...bot, tasks: bot.tasks!.map((task) => task.routineRunId ? { ...task, busy: true, activity: "working" as const } : task) };
+    const rows = allThreadRows(running);
+    expect(rows.find((row) => row.threadId === "run")).toMatchObject({ busy: true, activity: "working" });
+    expect(deleteAllThreadsCopy(rows).body).not.toContain("a new empty conversation will be started");
+  });
+
   it("sends every thread, running ones too, and says plainly which were kept", async () => {
     const post = vi.mocked(api);
-    post.mockResolvedValueOnce({ deleted: ["pinned"], refused: [{ threadId: "open", reason: "busy" }], bot: { id: "maus" } });
+    post.mockResolvedValueOnce({ deleted: ["pinned", "run"], refused: [{ threadId: "open", reason: "busy" }], bot: { id: "maus" } });
     const dispatch = vi.fn();
 
     await deleteAllThreads({ ...bot, busy: true, activity: "working" }, dispatch);
 
-    expect(post).toHaveBeenCalledWith("/api/bots/maus/tasks/delete", { method: "POST", body: JSON.stringify({ threadIds: ["open", "pinned"] }) });
-    expect(dispatch).toHaveBeenLastCalledWith({ type: "notice", notice: { kind: "note", botName: null, text: "Deleted: 1. Kept because they are running: 1." } });
+    expect(post).toHaveBeenCalledWith("/api/bots/maus/tasks/delete", { method: "POST", body: JSON.stringify({ threadIds: ["open", "pinned", "run"] }) });
+    expect(dispatch).toHaveBeenLastCalledWith({ type: "notice", notice: { kind: "note", botName: null, text: "Deleted: 2. Kept because they are running: 1." } });
   });
 });

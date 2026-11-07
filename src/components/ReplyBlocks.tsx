@@ -18,7 +18,7 @@ export function ReplyBlocks({ blocks, join, citation, tray, render }: {
   return (
     <div
       data-reply-blocks
-      className="flex w-full flex-col items-start gap-1"
+      className="flex w-full flex-col items-start gap-2"
       data-citation-source={citation.messageId}
       data-citation-owner-type={citation.ownerType}
       data-citation-owner={citation.ownerId}

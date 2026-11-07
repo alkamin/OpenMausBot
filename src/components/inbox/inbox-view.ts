@@ -1,6 +1,5 @@
 import { formatQuestionAnswers, questionChoices } from "../../../shared/ask-question";
-import type { InboxRow, InboxTab, InboxView } from "../../../shared/inbox";
-import type { NeedsYouItem } from "../../../shared/today";
+import { isInboxRequest, type InboxRow, type InboxTab, type InboxView } from "../../../shared/inbox";
 import { liveCardKind } from "../../../shared/live-approval";
 import { t } from "@/lib/i18n";
 import { dismissResponse, type CardResponse } from "@/lib/card-answer";
@@ -9,24 +8,20 @@ import { accessRequestWords, cardAnswerFor } from "../bot-access/access-card";
 /** The Needs you lines the inbox's card in the chat shows, the newest first. */
 export const CARD_ROWS = 3;
 
-export const rowsIn = (view: InboxView | null, tab: InboxTab): InboxRow[] => (view?.rows ?? []).filter((row) => row.tab === tab);
+export const rowsIn = (view: InboxView | null, tab: InboxTab): InboxRow[] => (view?.rows ?? []).filter((row) => isInboxRequest(row) && row.tab === tab);
 
 /** The inbox as one list, newest first: what waits on the person and their news; a settled line is read from where it
  * came, not listed again. */
-export const listedRows = (view: InboxView | null): InboxRow[] => (view?.rows ?? []).filter((row) => row.tab !== "done").sort((a, b) => b.at - a.at);
+export const listedRows = (view: InboxView | null): InboxRow[] => (view?.rows ?? []).filter((row) => isInboxRequest(row) && row.tab !== "done").sort((a, b) => b.at - a.at);
 
 export function tabCounts(view: InboxView | null): Record<InboxTab, number> {
   const counts: Record<InboxTab, number> = { "needs-you": 0, info: 0, done: 0 };
-  for (const row of view?.rows ?? []) counts[row.tab] += 1;
+  for (const row of view?.rows ?? []) if (isInboxRequest(row)) counts[row.tab] += 1;
   return counts;
 }
 
 /** What the Inbox row counts: every line waiting on the person, and news they have not read. */
-export const waitingCount = (view: InboxView | null): number => (view?.rows ?? []).filter((row) => row.tab === "needs-you" || (row.tab === "info" && row.unread)).length;
-
-/** What a team's person is told needs them beyond the inbox's lines: something to fix, or a question in their own chat. */
-export const inboxFixes = (items: readonly NeedsYouItem[] | undefined, view: InboxView | null): NeedsYouItem[] =>
-  (items ?? []).filter((item) => item.kind !== "message" && !(item.kind === "question" && view?.rows.some((row) => row.tab === "needs-you" && row.origin?.threadId === item.threadId)));
+export const waitingCount = (view: InboxView | null): number => (view?.rows ?? []).filter((row) => isInboxRequest(row) && (row.tab === "needs-you" || (row.tab === "info" && row.unread))).length;
 
 /** The conversation an answer to this line goes to: a team's copy, in the inbox's own, or where it was asked anywhere else. */
 export const answerThread = (view: Pick<InboxView, "threadId"> | null, row: Pick<InboxRow, "origin">): string | null => view?.threadId ?? row.origin?.threadId ?? null;

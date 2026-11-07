@@ -21,6 +21,7 @@ export interface RichTableProps {
   headless?: boolean;
   /** Simple mode draws a reply's table as a card; a table inside a card of its own (a widget) opts out. */
   card?: boolean;
+  appearance?: "panel" | "markdown";
 }
 
 /** The native modal supplies focus containment, Escape, an inert background and focus restoration. */
@@ -52,7 +53,7 @@ const SMALL_TABLE_ROWS = 8;
  * always shown and its buttons keep 40px targets, give it a band of its own. */
 const TABLE_CARD = "group/table relative w-full overflow-hidden rounded-[24px] bg-composer text-ink shadow-[0_0_0_0.5px_var(--color-composer-ring),0_2px_8px_rgb(28_28_28/0.035)] touch:pt-11";
 
-export function RichTable({ columns, rows, name = t("table.title"), expanded = false, direction = "ltr", headless = false, card: asCard = true }: RichTableProps) {
+export function RichTable({ columns, rows, name = t("table.title"), expanded = false, direction = "ltr", headless = false, card: asCard = true, appearance = "panel" }: RichTableProps) {
   const simple = !useAdvancedMode();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
@@ -117,7 +118,7 @@ export function RichTable({ columns, rows, name = t("table.title"), expanded = f
         {!large && <button type="button" className="table-action" aria-label={t("table.expand")} title={t("table.expand")} onClick={(event) => { trigger.current = event.currentTarget; setOpen(true); }}><Maximize2 size={14} /></button>}
     </>;
     return (
-    <div className={cn("rich-table w-fit min-w-[min(100%,var(--chat-prose-max))] max-w-full overflow-hidden rounded-xl border border-hairline/50 text-ink", simple ? "bg-composer" : "bg-panel")} dir="ltr">
+    <div className={cn("rich-table w-fit min-w-[min(100%,var(--chat-prose-max))] max-w-full overflow-hidden rounded-xl border border-hairline/50 text-ink", simple ? "bg-composer" : "bg-panel", appearance === "markdown" && "response-table")} dir="ltr">
       {!small && <div className="flex flex-wrap items-center gap-1 border-b border-hairline/40 px-2 py-1.5">
         {search("flex min-w-24 flex-1 items-center gap-2 px-1 text-ink-secondary")}
         {actions}

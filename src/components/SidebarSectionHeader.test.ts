@@ -26,13 +26,15 @@ describe("SidebarSectionHeader", () => {
     expect(html).not.toContain("uppercase");
   });
 
-  it.each([false, true])("keeps delete separate from collapse and the context menu, collapsed=%s", (collapsed) => {
+  it.each([false, true])("keeps bot management and delete separate from collapse and the context menu, collapsed=%s", (collapsed) => {
     const onContextMenu = () => {};
     const element = SidebarSectionHeader({
       name: "Work",
       collapsed,
       onToggle: () => {},
       onDelete: () => {},
+      onManageBots: () => {},
+      hasBots: true,
       onContextMenu,
       reorderable: true,
       dragging: false,
@@ -43,7 +45,12 @@ describe("SidebarSectionHeader", () => {
     expect(html).toContain('tabindex="-1"');
     expect(html).toContain('aria-label="Delete Work department"');
     expect(html).toContain(`aria-expanded="${!collapsed}"`);
-    expect(html.match(/<button\b/g)).toHaveLength(2);
+    expect(html.match(/<button\b/g)).toHaveLength(3);
+    expect(html).toContain('aria-label="Add or remove bots in Work"');
+    expect(html).toContain("lucide-plus");
+    expect(html.indexOf("</button>")).toBeLessThan(html.indexOf('aria-label="Add or remove bots in Work"'));
+    expect(html.indexOf("lucide-plus")).toBeLessThan(html.indexOf("lucide-trash"));
+    expect(html.indexOf("lucide-trash")).toBeLessThan(html.indexOf("lucide-grip-vertical"));
     expect(html.indexOf("</button>")).toBeLessThan(html.indexOf('aria-label="Delete Work department"'));
   });
 

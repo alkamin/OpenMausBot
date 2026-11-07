@@ -1,26 +1,18 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
-import { freePortBlock } from "./testing/ports.ts";
+import { removeTempDir } from "./testing/cleanup.ts";
+import { launchVerificationServer, runControlOmb, type VerificationServer } from "../scripts/control-omb.ts";
 
-// The fake claude CLI's one-shot text mode answers from a file each test rewrites.
-
-const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(SERVER_DIR, "..");
-const FAKE_CLAUDE = join(SERVER_DIR, "testing", "fake-claude-cli.ts");
-
-let child: ChildProcess;
+let fixture: VerificationServer;
 let home = "";
 let base = "";
-let output = "";
 let titleFile = "";
 let titleDump = "";
+const evidence: unknown[] = [];
 
 const api = async (method: string, path: string, body?: unknown): Promise<{ status: number; body: any }> => {
   const response = await fetch(`${base}${path}`, {
@@ -29,7 +21,15 @@ const api = async (method: string, path: string, body?: unknown): Promise<{ stat
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await response.text();
-  return { status: response.status, body: text ? JSON.parse(text) : null };
+  const result = { status: response.status, body: text ? JSON.parse(text) : null };
+  if (method !== "GET") evidence.push({ method, path, body, result });
+  return result;
+};
+
+const control = async (...args: string[]) => {
+  const result = await runControlOmb([...args, "--url", base]);
+  evidence.push({ command: args, result });
+  return result;
 };
 
 const taskTitle = async (botId: string, threadId: string): Promise<string | undefined> => {
@@ -39,71 +39,83 @@ const taskTitle = async (botId: string, threadId: string): Promise<string | unde
 
 beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), "omb-regenerate-title-"));
-  const data = join(home, ".openmausbot");
-  const staticDir = join(home, "static");
-  mkdirSync(data, { recursive: true });
-  mkdirSync(join(staticDir, "assets"), { recursive: true });
-  writeFileSync(join(staticDir, "index.html"), "<!doctype html><title>Regenerate title test</title>");
-  writeFileSync(join(staticDir, "assets", "smoke.css"), "body{}");
   titleFile = join(home, "title.txt");
   titleDump = join(home, "title-dump.json");
-  writeFileSync(join(data, "config.json"), JSON.stringify({
-    features: { llmThreadTitles: true },
-    instances: {
-      titled: {
-        driver: "claudeAgent", displayName: "Titled fixture", config: { cli: FAKE_CLAUDE },
-        environment: { FAKE_CLAUDE_MODE: "happy", FAKE_CLAUDE_TEXT_DUMP: titleDump, FAKE_CLAUDE_TEXT_FILE: titleFile },
-      },
-    },
-  }));
-  const port = await freePortBlock([0, 1]);
-  base = `http://127.0.0.1:${port}`;
-  child = spawn(process.execPath, [join(SERVER_DIR, "index.ts")], {
-    cwd: ROOT,
-    env: {
-      ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-      ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      HOME: home,
-      USERPROFILE: home,
-      OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_STATIC_DIR: staticDir,
-    },
-    stdio: ["ignore", "pipe", "pipe"],
+  fixture = await launchVerificationServer({
+    ...process.env, FAKE_CLAUDE_TEXT_DUMP: titleDump, FAKE_CLAUDE_TEXT_FILE: titleFile,
   });
-  child.stdout!.on("data", (chunk) => (output += chunk));
-  child.stderr!.on("data", (chunk) => (output += chunk));
-  const deadline = Date.now() + 20_000;
-  for (;;) {
-    if (child.exitCode !== null) throw new Error(`server exited ${child.exitCode}: ${output}`);
-    try {
-      if ((await fetch(`${base}/api/health`)).status === 200) break;
-    } catch {
-    }
-    if (Date.now() >= deadline) throw new Error(`server never became healthy: ${output}`);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
+  base = fixture.info.url;
+  evidence.push({ fixture: fixture.info });
 }, 30_000);
 
 afterAll(async () => {
-  if (child) await waitForExit(child, { signal: "SIGTERM" });
+  if (fixture) {
+    const evidencePath = `${fixture.info.logPath}.thread-titles.json`;
+    writeFileSync(evidencePath, JSON.stringify(evidence, null, 2));
+    console.info(JSON.stringify({ logPath: fixture.info.logPath, evidencePath }));
+    await fixture.close();
+  }
   if (home) await removeTempDir(home);
 });
 
-describe("Regenerate title", { timeout: 60_000 }, () => {
+describe("Thread topic labels and title regeneration", { timeout: 60_000 }, () => {
   let botId = "";
   let threadId = "";
 
-  it("offers itself through the config only while generated titles are on", async () => {
+  it("enables topic summaries without an explicit feature setting", async () => {
+    const stored = JSON.parse(readFileSync(join(fixture.info.dataDir, "config.json"), "utf8"));
+    expect(stored.features).not.toHaveProperty("llmThreadTitles");
     expect((await api("GET", "/api/config")).body.features.llmThreadTitles).toBe(true);
+  });
+
+  it("summarizes new direct and channel chats into persisted topic labels by default", async () => {
+    writeFileSync(titleFile, "Fix session expiry\n");
+    const { bot } = (await api("POST", "/api/bots", { name: "Topic labels" })).body;
+    await api("PATCH", `/api/bots/${bot.id}`, { memoryUpkeep: false });
+    const sent = await api("POST", `/api/bots/${bot.id}/messages`, { text: "Could you help me? Every login hangs after the session expires." });
+    expect(sent.status).toBe(202);
+    await expect.poll(() => taskTitle(bot.id, sent.body.threadId), { timeout: 10_000 }).toBe("Fix session expiry");
+    await control("wait", "--bot", bot.id, "--task", sent.body.threadId, "--timeout", "20");
+    await control("messages", "--bot", bot.id, "--task", sent.body.threadId, "--limit", "10");
+    const prompt = JSON.parse(readFileSync(titleDump, "utf8")).prompt;
+    expect(prompt).toContain("Summarize the topic or goal for a sidebar label");
+    expect(prompt).toContain("Every login hangs after the session expires");
+
+    writeFileSync(titleFile, "Plan product launch\n");
+    const { group } = (await api("POST", "/api/groups", {
+      name: "Launch team", memberIds: [bot.id],
+      setup: { bulletin: "", defaultResponder: { kind: "member", botId: bot.id } },
+    })).body;
+    expect((await api("POST", `/api/groups/${group.id}/messages`, { text: "I was thinking we should prepare a plan for our product launch." })).status).toBe(202);
+    await expect.poll(async () => {
+      const state = (await api("GET", "/api/bots?messages=0")).body;
+      const current = state.groups.find((candidate: { id: string }) => candidate.id === group.id);
+      return current?.tasks?.find((task: { threadId: string }) => task.threadId === group.threadId)?.title;
+    }, { timeout: 10_000 }).toBe("Plan product launch");
+    await expect.poll(async () => (await api("GET", "/api/bots?messages=0")).body.groups.find((candidate: { id: string }) => candidate.id === group.id)?.working,
+      { timeout: 20_000 }).toBeFalsy();
+    evidence.push({ channel: (await api("GET", "/api/bots?messages=0")).body.groups.find((candidate: { id: string }) => candidate.id === group.id) });
+    const savedBots = JSON.parse(readFileSync(join(fixture.info.dataDir, "bots.json"), "utf8"));
+    expect(savedBots.find((candidate: { id: string }) => candidate.id === bot.id).tasks)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ threadId: sent.body.threadId, title: "Fix session expiry" })]));
+  });
+
+  it("preserves a topic label chosen by the person when the first message arrives", async () => {
+    const { bot } = (await api("POST", "/api/bots", { name: "Custom label" })).body;
+    await api("PATCH", `/api/bots/${bot.id}`, { memoryUpkeep: false });
+    const { task } = (await api("POST", `/api/bots/${bot.id}/tasks`, { title: "Release checklist" })).body;
+    rmSync(titleDump, { force: true });
+    expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "Help prepare a product launch", threadId: task.threadId })).status).toBe(202);
+    await control("wait", "--bot", bot.id, "--task", task.threadId, "--timeout", "20");
+    expect(await taskTitle(bot.id, task.threadId)).toBe("Release checklist");
+    expect(existsSync(titleDump)).toBe(false);
   });
 
   it("names a renamed thread from its recent conversation, without tool output", async () => {
     const bot = (await api("POST", "/api/bots", {
-      modelSelection: { instanceId: "titled", model: "claude-sonnet-5" }, requireAvailableModel: true,
+      modelSelection: { instanceId: "claude", model: "claude-sonnet-5" }, requireAvailableModel: true,
     })).body.bot;
     botId = bot.id;
-    // background memory capture is a one-shot too; keep it off this dump
     expect((await api("PATCH", `/api/bots/${botId}`, { memoryUpkeep: false })).status).toBe(200);
     rmSync(titleFile, { force: true });
     const sent = await api("POST", `/api/bots/${botId}/messages`, { text: "every login hangs after the session expires" });
@@ -115,6 +127,7 @@ describe("Regenerate title", { timeout: 60_000 }, () => {
       return !current?.busy && (page?.messages ?? []).some((message: { role: string; kind: string }) => message.role === "bot" && message.kind === "text");
     }, { timeout: 20_000, interval: 150 }).toBe(true);
     await expect.poll(() => existsSync(titleDump), { timeout: 10_000 }).toBe(true);
+    expect(await taskTitle(botId, threadId)).toBe("every login hangs after the session expires");
     rmSync(titleDump, { force: true });
 
     expect((await api("PATCH", `/api/bots/${botId}/tasks/${threadId}`, { title: "My name for it" })).status).toBe(200);
@@ -156,5 +169,11 @@ describe("Regenerate title", { timeout: 60_000 }, () => {
     const off = await api("POST", `/api/bots/${botId}/tasks/${threadId}/title`);
     expect(off.status).toBe(409);
     expect(await taskTitle(botId, threadId)).toBe("Session expiry login hang");
+    const { task } = (await api("POST", `/api/bots/${botId}/tasks`, {})).body;
+    rmSync(titleDump, { force: true });
+    expect((await api("POST", `/api/bots/${botId}/messages`, { text: "Keep excerpt labels when explicitly disabled", threadId: task.threadId })).status).toBe(202);
+    await control("wait", "--bot", botId, "--task", task.threadId, "--timeout", "20");
+    expect(await taskTitle(botId, task.threadId)).toBe("Keep excerpt labels when explicitly disabled");
+    expect(existsSync(titleDump)).toBe(false);
   });
 });

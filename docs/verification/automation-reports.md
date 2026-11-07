@@ -4,8 +4,10 @@ A run of a schedule, a Run now, a startup run, a webhook or an app event still
 works in its own hidden conversation with a fresh session. What it leaves in
 the chat it reports to (the bot's main chat unless the routine chose another):
 
-- **A result**: its last reply, once, as a normal bot message with a small
-  caption naming the automation and its time, and **See run** for the full run.
+- **A result**: its last reply, once, as a normal bot message grouped under an
+  **Automation report** header. A left border connects the header to that
+  message; the automation name wraps, its time and status stay separate, and
+  **See run** opens the full run.
 - **Nothing**, when its last line is `NOTHING NEW`: no message, no unread dot,
   no notification. The trigger card, Automations and Today say "Nothing new"
   or leave it out.

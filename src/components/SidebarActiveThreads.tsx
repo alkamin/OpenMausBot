@@ -1,4 +1,3 @@
-// For a server older than this page, which has no inbox for anyone off a team: the Active Threads button and tray.
 import { Activity, Pin, PinOff } from "lucide-react";
 import { useRef, useState, type Dispatch } from "react";
 import { cn } from "@/lib/cn";

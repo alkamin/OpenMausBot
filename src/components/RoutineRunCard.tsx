@@ -1,4 +1,5 @@
 import { ArrowRight, Loader2, Zap } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 import { routineDateTime } from "@/lib/routine-display";
@@ -141,8 +142,16 @@ export function RoutineRunRow({ message, botId }: { message: Message; botId: str
   );
 }
 
-/** Above a line an automation run wrote in a chat: which automation, when, and the way to its full run. */
-export function AutomationCaption({ message, line, botId }: { message: Message; line: AutomationLine; botId: string }) {
+export function AutomationReport({ message, line, botId, children }: { message: Message; line: AutomationLine; botId: string; children: ReactNode }) {
+  return (
+    <section data-automation-report={line.runId} className="flex min-w-0 flex-col gap-3 border-s-2 border-accent/30 ps-4">
+      <AutomationCaption message={message} line={line} botId={botId} />
+      {children}
+    </section>
+  );
+}
+
+function AutomationCaption({ message, line, botId }: { message: Message; line: AutomationLine; botId: string }) {
   const { state, dispatch } = useStore();
   const showThreads = useShowThreads();
   const canOpen = state.bots.some((bot) => bot.threadId === line.executionThreadId || hasRoutineExecutionTask(bot.tasks, line.executionThreadId));
@@ -150,19 +159,26 @@ export function AutomationCaption({ message, line, botId }: { message: Message; 
     !state.bots.find((bot) => bot.id === botId)?.messages.some((later) => later.role === "user" && later.at > message.at));
   const tone = line.partial ? "text-warning" : line.failed ? "text-danger" : asking ? "text-warning" : "text-accent";
   return (
-    <div data-automation-caption={line.runId} className="-mb-2 flex min-w-0 items-center gap-1.5 pl-0.5 text-[11px] text-ink-tertiary">
-      <Zap aria-hidden="true" size={12} className={cn("shrink-0", tone)} />
-      <span className="truncate font-medium text-ink-secondary">{line.name}</span>
-      <time className="shrink-0" dateTime={new Date(line.scheduledFor).toISOString()}>· {formatTime(line.scheduledFor)}</time>
-      {(line.failed || asking) && <span className={cn("shrink-0", tone)}>· {t(line.partial ? "chat.automation.partial" : line.failed ? "chat.automation.failed" : "chat.automation.needsYou")}</span>}
+    <div data-automation-caption={line.runId} className="flex w-full min-w-0 max-w-[680px] items-start justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-secondary">
+          <span className="inline-flex items-center gap-1.5"><Zap aria-hidden="true" size={12} />{t("chat.automation.report")}</span>
+          <time dateTime={new Date(line.scheduledFor).toISOString()}>{formatTime(line.scheduledFor)}</time>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="min-w-0 text-[13px] font-medium text-ink [overflow-wrap:anywhere]">{line.name}</span>
+          {(line.failed || asking) && <span className={cn("rounded-md bg-inset px-1.5 py-0.5 text-[11px]", tone)}>{t(line.partial ? "chat.automation.partial" : line.failed ? "chat.automation.failed" : "chat.automation.needsYou")}</span>}
+        </div>
+      </div>
       {canOpen && (
         <button
           type="button"
           onClick={() => openThread(dispatch, { botId, threadId: line.executionThreadId }, state, showThreads)}
           aria-label={t("chat.automation.openRunFor", { name: line.name })}
-          className="shrink-0 rounded px-1 hover:bg-inset hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-hairline/60 bg-card px-2.5 py-1.5 text-[12px] font-medium text-ink-secondary hover:bg-inset hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           {t("chat.automation.openRun")}
+          <ArrowRight aria-hidden="true" size={13} />
         </button>
       )}
     </div>

@@ -46,6 +46,12 @@ describe("splitReplyBlocks", () => {
     expect(splitReplyBlocks(`${table}\n\n${table}`).map((block) => block.kind)).toEqual(["table", "table"]);
   });
 
+  it("keeps a table inside a disclosure with its surrounding Markdown", () => {
+    const text = `<details>\n<summary>Detailed figures</summary>\n\n${table}\n\n</details>`;
+    expect(isFormattedReply(text)).toBe(true);
+    expect(splitReplyBlocks(text)).toEqual([{ kind: "prose", text }]);
+  });
+
   it("never counts pipes inside a code fence, and needs a delimiter row under the first line", () => {
     const fenced = "```md\n| a | b |\n|---|---|\n```";
     expect(splitReplyBlocks(fenced)).toEqual([{ kind: "prose", text: fenced }]);

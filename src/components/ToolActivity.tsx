@@ -1,5 +1,5 @@
-import { Check, ChevronRight, Circle, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, ChevronRight, Circle, Copy, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/state/api";
 import type { Message } from "@/state/store";
 import { cn } from "@/lib/cn";
@@ -12,6 +12,28 @@ import { isNoticeCode, routineLineText } from "@/lib/activity-text";
 import type { MessageAttachmentContext } from "./AttachmentPreview";
 import { PlaceIcon } from "./PlaceIcon";
 import { WorkingDots } from "./WorkingIndicator";
+import { useCopyFeedback } from "@/lib/copy-text";
+
+function ToolDetailBlock({ label, text, result = false }: { label: string; text: string; result?: boolean }) {
+  const { state, copy } = useCopyFeedback(text);
+  const formatted = useMemo(() => {
+    if (text.length > 64_000 || !/^\s*(?:\{|\[)/.test(text)) return text;
+    try { return JSON.stringify(JSON.parse(text), null, 2); } catch { return text; }
+  }, [text]);
+  const copyLabel = state === "copied" ? t("code.copied") : state === "failed" ? t("common.copyFailed") : t("toolDetail.copy", { section: label });
+  return (
+    <section className="min-w-0 overflow-hidden rounded-lg border border-hairline/40 bg-inset/50">
+      <div className="flex min-h-8 items-center justify-between gap-2 border-b border-hairline/30 px-3 text-[11px] font-medium">
+        <span>{label}</span>
+        <button type="button" aria-label={copyLabel} title={copyLabel} onClick={copy} className="flex min-h-8 min-w-8 items-center justify-center rounded text-ink-secondary hover:text-ink focus-visible:outline-2 focus-visible:outline-accent">
+          {state === "copied" ? <Check size={13} aria-hidden="true" /> : state === "failed" ? <X size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+        </button>
+        <span className="sr-only" role="status">{state === "idle" ? "" : copyLabel}</span>
+      </div>
+      <pre dir="ltr" className={cn("overflow-auto p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words text-ink", result ? "max-h-64" : "max-h-52")}>{formatted}</pre>
+    </section>
+  );
+}
 
 /** Which stored message a step is: a clipped step (its output cut short in conversation pages) loads the rest from it. */
 export function ToolActivity({ tool, place = null, live = false, source }: { tool: NonNullable<Message["tool"]>; place?: Place | null; live?: boolean; source?: MessageAttachmentContext }) {
@@ -25,12 +47,12 @@ export function ToolActivity({ tool, place = null, live = false, source }: { too
   const label = advanced && !notice ? tool.label ?? tool.name : toolStepLabel(tool);
   const status = tool.ok === undefined ? (live ? t("toolDetail.running") : t("toolDetail.unverified")) : failed ? t("toolDetail.failed") : t("toolDetail.completed");
   return (
-    <details onToggle={(event) => setExpanded(event.currentTarget.open)} className="group/tool w-fit max-w-full rounded-xl border border-hairline/40 bg-panel text-[13px] open:w-[min(38rem,100%)]" data-testid="tool-activity">
+    <details onToggle={(event) => setExpanded(event.currentTarget.open)} className="group/tool min-w-0 w-fit max-w-full text-[13px] open:w-[min(44rem,100%)]" data-testid="tool-activity">
       <summary
         role="button"
         aria-expanded={expanded}
         aria-label={t("toolDetail.label", { name: label, status })}
-        className={cn("flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-xl px-3 py-1.5 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden", failed ? "text-danger" : "text-ink-secondary")}
+        className={cn("flex min-h-9 cursor-pointer list-none items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden", failed ? "text-danger" : "text-ink-secondary")}
       >
         <span className="shrink-0" aria-hidden="true">{tool.ok === undefined ? (live ? <WorkingDots size={3.5} /> : <Circle size={13} />) : failed ? <X size={13} /> : <Check size={13} className="text-success" />}</span>
         {place && <PlaceIcon place={place} size={13} className="shrink-0 opacity-70" role="img" aria-label={t(placeLabelKey(place))} data-testid="tool-place" />}
@@ -38,20 +60,14 @@ export function ToolActivity({ tool, place = null, live = false, source }: { too
         {advanced && tool.summary && tool.summary !== tool.name && !nameIsCommand(tool.name) && <span className="min-w-0 flex-1 truncate font-mono" title={summary}>{summary}</span>}
         <ChevronRight size={13} className="ml-auto shrink-0 group-open/tool:rotate-90" aria-hidden="true" />
       </summary>
-      <div className="space-y-3 border-t border-hairline/40 p-3 text-ink-secondary">
+      <div className="ms-3 space-y-3 border-s border-hairline/60 py-2 ps-4 text-ink-secondary">
         <div className={cn("text-[11px] font-medium", failed && "text-danger")}>{status}</div>
         {label !== tool.name && !notice && <div>
           <div className="mb-1 text-[11px] font-medium">{t("toolDetail.tool")}</div>
           <p dir="ltr" className="break-words font-mono text-xs text-ink" data-testid="tool-name">{tool.name}</p>
         </div>}
-        <div>
-          <div className="mb-1 text-[11px] font-medium">{t("toolDetail.input")}</div>
-          <pre dir="ltr" className="max-h-52 overflow-auto rounded-lg bg-inset p-2.5 font-mono text-xs whitespace-pre-wrap break-words text-ink">{tool.input ?? (tool.summary ? summary : notice ? label : tool.name)}</pre>
-        </div>
-        <div>
-          <div className="mb-1 text-[11px] font-medium">{t("toolDetail.output")}</div>
-          {output ? <pre dir="ltr" className="max-h-64 overflow-auto rounded-lg bg-inset p-2.5 font-mono text-xs whitespace-pre-wrap break-words text-ink">{output}</pre> : <p className="text-xs">{tool.ok === undefined ? (live ? t("toolDetail.waiting") : t("toolDetail.unverified")) : t("toolDetail.noOutput")}</p>}
-        </div>
+        <ToolDetailBlock label={t("toolDetail.input")} text={tool.input ?? (tool.summary ? summary : notice ? label : tool.name)} />
+        {output ? <ToolDetailBlock label={t("toolDetail.output")} text={output} result /> : <p className="text-xs">{tool.ok === undefined ? (live ? t("toolDetail.waiting") : t("toolDetail.unverified")) : t("toolDetail.noOutput")}</p>}
         {(full.state === "loading" || full.state === "failed") && <p className="text-[11px] text-ink-secondary" role="status">{t(full.state === "loading" ? "toolDetail.loadingFull" : "toolDetail.partial")}</p>}
         <p className="text-[11px] text-ink-secondary">{t("toolDetail.previewHint")}</p>
       </div>

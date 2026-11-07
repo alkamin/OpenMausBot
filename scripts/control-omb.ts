@@ -156,6 +156,7 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
     // A caller's FAKE_CLAUDE_MODE overrides this below to drive failure paths.
     FAKE_CLAUDE_MODE: parentEnv.FAKE_CLAUDE_MODE || "happy",
     FAKE_CLAUDE_DUMP: join(dataDir, "fake-claude-dump.json"),
+    FAKE_CLAUDE_TEXT_DUMP: join(dataDir, "fake-claude-text-dump.json"),
     // POSIX resolves the fake CLI's `#!/usr/bin/env node` shebang through PATH;
     // Windows resolves it through spawnCli without a shell.
     PATH: dirname(process.execPath),

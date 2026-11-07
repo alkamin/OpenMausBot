@@ -39,7 +39,7 @@ function place(call: Call, home: () => string) {
     (plan[botId] ??= { script: [] }).script.push(...entries);
     writeFileSync(file(), JSON.stringify(plan));
   };
-  const turns = (botId: string): Array<{ planKey?: string; threadId?: string; prompt: unknown }> => {
+  const turns = (botId: string): Array<{ planKey?: string; threadId?: string; prompt: unknown; system: string }> => {
     const path = `${file()}.evidence.jsonl`;
     return existsSync(path) ? readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)).filter((turn) => turn.botId === botId) : [];
   };
@@ -85,6 +85,49 @@ describe.each([
     expect(await h.inbox()).toMatchObject({ rows: [], threadId: null });
     expect(await h.count()).toBe(0);
   });
+
+  it("lists a tag from a direct chat once, ignores ordinary updates and code examples, and sends the answer back", async () => {
+    const h = here();
+    const eli = await h.bot(`Tagger ${role}`);
+    const call = role === "desktop" ? fx.local : fx.onCloud;
+    h.script(eli.id,
+      { key: "TAG-QUIET", match: ["TAG-QUIET-GO"], reply: "The draft is ready. Example: `@you` is a tag." },
+      { key: "TAG-ASK", match: ["TAG-ASK-GO"], reply: "@you please choose which draft to publish." },
+      { key: "TAG-ANSWER", match: ["Publish the second draft"], reply: "Publishing the second draft." });
+    await h.say(eli.id, eli.threadId, "TAG-QUIET-GO");
+    await until(async () => (await h.messages(eli.threadId)).some((line) => line.text?.startsWith("The draft is ready.")), "the untagged reply");
+    expect((await h.listed()).filter((row) => row.origin?.threadId === eli.threadId)).toEqual([]);
+    await h.say(eli.id, eli.threadId, "TAG-ASK-GO");
+    await until(async () => (await h.listed()).some((row) => row.origin?.threadId === eli.threadId), "the tagged reply in the inbox");
+    const rows = (await h.listed()).filter((row) => row.origin?.threadId === eli.threadId);
+    expect(rows).toHaveLength(1);
+    const row = rows[0]!;
+    expect(row).toMatchObject({ kind: "message", replies: true, text: "@you please choose which draft to publish." });
+    expect((await h.messages(eli.threadId)).filter((line) => line.text === row.text).map((line) => line.id)).toEqual([row.id]);
+    expect((await h.notes()).filter((note) => note.threadId === eli.threadId && note.kind === "mention")).toHaveLength(1);
+    expect(h.turns(eli.id).find((turn) => turn.planKey === "TAG-QUIET")?.system).toContain("tag them with @you");
+    await h.say(eli.id, eli.threadId, "Publish the second draft", { replyToId: row.id });
+    await until(async () => (await h.messages(eli.threadId)).some((line) => line.text === "Publishing the second draft."), "the answer in its original chat");
+    expect((await h.listed()).some((one) => one.id === row.id)).toBe(false);
+    expect((await call("GET", "/api/inbox/count")).body.count).toBe(0);
+  }, hostTimeout(120_000));
+
+  it("lists channel tags once with the original message and one mention notification", async () => {
+    const h = here();
+    const eli = await h.bot(`Channel tagger ${role}`);
+    const call = role === "desktop" ? fx.local : fx.onCloud;
+    const made = await call("POST", "/api/groups", { name: "Inbox review", memberIds: [eli.id], setup: { bulletin: "", defaultResponder: { kind: "member", botId: eli.id } } });
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    const group = made.body.group as { id: string; threadId: string };
+    h.script(eli.id, { key: "CHANNEL-TAG", match: ["CHANNEL-TAG-GO"], reply: "@you please review the channel draft." });
+    expect((await call("POST", `/api/groups/${group.id}/messages`, { text: "CHANNEL-TAG-GO" })).status).toBe(202);
+    await until(async () => (await h.listed()).some((row) => row.origin?.threadId === group.threadId), "the channel's tag");
+    const rows = (await h.listed()).filter((row) => row.origin?.threadId === group.threadId);
+    expect(rows).toHaveLength(1);
+    expect((await h.messages(group.threadId)).filter((line) => line.text === "@you please review the channel draft.")).toHaveLength(1);
+    expect((await h.notes()).filter((note) => note.threadId === group.threadId && note.kind === "mention")).toHaveLength(1);
+    expect((await call("POST", `/api/inbox/${rows[0]!.id}/done`)).status).toBe(200);
+  }, hostTimeout(120_000));
 
   it("lists a bot's approval and question with the right count and their threads, and an answer from the inbox reaches the bot, whose turn goes on", async () => {
     const h = here();

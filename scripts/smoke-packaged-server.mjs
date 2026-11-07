@@ -67,6 +67,7 @@ try {
 const fixtureEnv = {
   ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
   ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
+  ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
   HOME: home,
   USERPROFILE: home,
   APPDATA: join(home, "AppData", "Roaming"),

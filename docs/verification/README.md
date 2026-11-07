@@ -162,6 +162,13 @@ real Settings connection component in disposable Electron windows.
 The [loading screen and tray smoke](startup-tray.md) checks the startup close
 button, hidden handoff, tray restore, and Quit in a disposable Electron profile.
 
+The [macOS quit/Dock fixture](mac-quit-dock.md) checks that final quit removes the
+app from the Dock even when an independent background child survives, using two
+disposable Electron app bundles and homes.
+
+The [local macOS signing fixture](mac-local-signing.md) checks that rebuilt apps
+and their helpers retain their certificate-based identities across changed binaries.
+
 The [optional organization connection smoke](organization-settings.md) checks
 the real Settings panel and production desktop client against a synthetic
 Admin server, including cancellation, revocation and unchanged normal startup.

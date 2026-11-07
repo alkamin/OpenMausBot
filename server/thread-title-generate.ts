@@ -1,11 +1,9 @@
-// Generated thread titles, on when features.llmThreadTitles is: the engine's one-shot text call, given 10 seconds, its
-// reply cleaned to a title or null.
 import type { AppConfig } from "./config.ts";
 import { titleFromLlm } from "./store.ts";
 import { threadTitlePrompt, type ThreadTitleSource } from "./thread-title.ts";
 
 export function llmThreadTitlesEnabled(cfg: Pick<AppConfig, "features">): boolean {
-  return cfg.features?.llmThreadTitles === true;
+  return cfg.features?.llmThreadTitles !== false;
 }
 
 export async function generateThreadTitle(

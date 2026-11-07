@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import { botOwner } from "../../shared/bot-owner.ts";
-import type { InboxItem, InboxRow, InboxTab, InboxTask, InboxView } from "../../shared/inbox.ts";
+import { isInboxRequest, type InboxItem, type InboxRow, type InboxTab, type InboxTask, type InboxView } from "../../shared/inbox.ts";
 import { liveCardKind } from "../../shared/live-approval.ts";
 import type { Notification } from "../../shared/notification.ts";
 import { ASK_NOTIFICATIONS } from "../ask-routing.ts";
@@ -469,7 +469,7 @@ export function createPersonInbox(deps: PersonInboxDeps) {
         return bot ? { botId: bot.id, threadId: null, rows: [], anchor: null } : null;
       }
       const lines = new Map(store.messagesFor(at.threadId).map((message) => [message.id, message]));
-      const own = items.filter((item) => item.person === person && item.threadId === at.threadId && lines.has(item.id)).sort((a, b) => b.at - a.at);
+      const own = items.filter((item) => isInboxRequest(item) && item.person === person && item.threadId === at.threadId && lines.has(item.id)).sort((a, b) => b.at - a.at);
       const rows = own.slice(0, VIEW_ROWS).map((item): InboxRow => {
         const posted = lines.get(item.id)!;
         return {
@@ -505,7 +505,7 @@ export function createPersonInbox(deps: PersonInboxDeps) {
     },
     /** What arrived in this person's inbox that they have not opened yet and still waits on them, newest first. */
     unseen(person: string): Item[] {
-      return items.filter((item) => item.person === person && !item.seen && !settled(item)).sort((a, b) => b.at - a.at);
+      return items.filter((item) => isInboxRequest(item) && item.person === person && !item.seen && !settled(item)).sort((a, b) => b.at - a.at);
     },
     /** The person opened or wrote in this conversation: what waited there for them is seen. */
     seen(person: string, threadId: string): void {

@@ -43,12 +43,27 @@ const luna = (messages: Message[], extra: Partial<Bot> = {}): Bot => ({
   tasks: [{ threadId: "main", title: "Main", createdAt: 1, busy: false, activity: "idle", modelSelection: { instanceId: "test", model: "m" }, approvalMode: "ask" }],
   ...extra,
 });
-const draw = (bot: Bot) => {
-  const state: AppState = { ...initialState, connected: true, selectedId: bot.id, bots: [bot], instances, config: { team } as AppState["config"] };
+const draw = (bot: Bot, teammates: Bot[] = []) => {
+  const state: AppState = { ...initialState, connected: true, selectedId: bot.id, bots: [bot, ...teammates], instances, config: { team } as AppState["config"] };
   const value = { state, dispatch: () => {}, flushBotPatches: async () => null, refreshInstances: async () => {}, refreshModels: async () => {} };
   flushSync(() => root.render(createElement(BotEditorStore, { value, children: createElement(ChatView, { bot }) })));
 };
 const row = (text: string) => [...container.querySelectorAll<HTMLElement>("[data-message-row]")].find((element) => element.textContent?.includes(text))!;
+
+it("labels consecutive bot messages and distinguishes an incoming teammate from the person", () => {
+  const scout = { ...luna([]), id: "scout", name: "Scout", color: "blue" as const };
+  const own = (id: string, text: string): Message => ({ id, role: "bot", kind: "text", text, at: 1 });
+  const peer: Message = { id: "peer", role: "user", kind: "text", text: "I found the report.", at: 1, peerAsk: { botId: "scout", name: "Scout" } };
+  draw(luna([own("a", "Checking the figures."), own("b", "The figures match."), peer]), [scout]);
+  expect(row("Checking the figures.").querySelector('[data-bot-author="luna"]')).not.toBeNull();
+  expect(row("The figures match.").querySelector('[data-bot-author="luna"]')).not.toBeNull();
+  const incoming = row("I found the report.");
+  expect(incoming.querySelector('[data-bot-author="scout"]')?.textContent).toContain("Scout");
+  expect(incoming.textContent).not.toContain("ask_bot");
+  expect(incoming.querySelector('[data-bot-color="blue"]')).not.toBeNull();
+  expect(incoming.querySelector('[data-peer-message]')?.classList).toContain("peer-message-surface");
+  expect(incoming.querySelector('[data-chat-bubble]')?.classList).not.toContain("bg-bubble-user");
+});
 
 it("shows a teammate's line in a shared chat as theirs, with their name, and only the viewer's own in their bubble", () => {
   setColorUserBubbles(true);

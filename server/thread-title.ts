@@ -19,6 +19,8 @@ export function threadTitlePrompt(text: string, source: ThreadTitleSource = "fir
   return [
     ask,
     "Reply with only a short title: 3 to 6 words, plain text, no quotes, no trailing period.",
+    "Summarize the topic or goal for a sidebar label, rather than quoting the opening words.",
+    "Use the conversation's language and at most 48 characters.",
     label,
     text.trim().slice(0, TITLE_INPUT_MAX_CHARS),
   ].join("\n");

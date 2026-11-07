@@ -25,5 +25,5 @@ export function MarkdownTable({ children, direction }: { children?: ReactNode; d
     const rows = elements(body?.props.children).map((row) => elements(row.props.children).map(cell));
     return { columns, rows };
   }, [children]);
-  return <RichTable {...data} direction={direction} />;
+  return <RichTable {...data} direction={direction} appearance="markdown" card={false} />;
 }

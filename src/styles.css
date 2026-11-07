@@ -2,6 +2,7 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
+@import "./t3-response.css";
 
 /* Phones and tablets have no hover, and Tailwind only applies `hover:` and
    `group-hover:` under `@media (hover: hover)`. A control revealed on hover
@@ -1112,26 +1113,31 @@
 
 /* A reply's long unbroken text (a URL, a run of letters) wraps inside its bubble instead of running past the window.
    Code blocks keep scrolling sideways; table cells keep their widths. */
-.chat-md :is(p, li, h1, h2, h3, h4, blockquote) { overflow-wrap: anywhere; }
+.chat-md :is(p, li, h1, h2, h3, h4, h5, h6, blockquote, summary) { overflow-wrap: anywhere; }
 
+.chat-text {
+  line-height: 1.75;
+}
 .chat-text,
 .chat-md {
-  line-height: 1.75;
   font-family: "omb-chat", var(--font-sans);
 }
 .chat-md :is(strong, b) {
   font-weight: 600;
 }
-[data-chat-bubble="simple"] :is(.chat-md, .chat-text),
+[data-chat-bubble="simple"] .chat-text,
 [data-chat-bubble="simple"].chat-text {
   line-height: 22px;
 }
-[data-chat-bubble="simple"] .chat-md > * + * {
-  margin-top: 10px;
-}
-/* A card under its own bot's bubble (and a bubble under its card) sits 12px below it, not the 16px between senders. */
 [data-simple-rows] > [data-tuck] > :first-child {
-  margin-top: -4px;
+  margin-top: -24px;
+}
+.chat-column > [data-user-turn] > [data-message-row] { margin-top: 16px; }
+.peer-message-surface {
+  border-inline-start: 3px solid var(--peer-message-accent);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--peer-message-accent) 5%, var(--color-app));
 }
 /* Arabic and Hebrew script needs the taller line the rest of the app gives it. */
 [data-chat-bubble="simple"] .chat-md [dir="rtl"] {

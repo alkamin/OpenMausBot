@@ -352,7 +352,7 @@ describe("repaired tables", () => {
     const html = renderToStaticMarkup(createElement(ChatMarkdown, {
       text: "Pros | Cons\n---\n\n| a \\| b | c |\n| --- | --- |\n| 1 | 2 |",
     }));
-    expect(html).toContain('font-semibold">Pros | Cons</div>');
+    expect(html).toContain('font-semibold">Pros | Cons</h2>');
     expect(html.match(/<table\b/g)).toHaveLength(1);
     expect(html).toContain(">a | b</span>");
     expect(html.match(/<th\b/g)).toHaveLength(2);
@@ -555,7 +555,7 @@ describe("#Title thread links in markdown", () => {
     const markup = render("`#QA PR 245` in code, [#QA PR 245](https://example.test) as a link, #123 an issue\n\n# QA PR 245\n\nplain");
     expect(markup).not.toContain("data-thread-link");
     expect(markup).toContain("<code");
-    expect(markup).toContain('font-semibold">QA PR 245</div>');
+    expect(markup).toContain('font-semibold">QA PR 245</h1>');
   });
 
   it("does nothing without any visible threads", () => {
@@ -974,7 +974,7 @@ describe("ChatMarkdown code blocks", () => {
   it.each([
     ["tsx", "TypeScript (TSX)"],
     ["averylongunknownlanguageidentifier", "Averylongunknownlanguageidentifier"],
-  ])("lets the %s badge shrink without wrapping the count or controls", (lang, label) => {
+  ])("keeps the %s title readable without crowding the controls", (lang, label) => {
     const html = renderToStaticMarkup(createElement(CodeBlock, {
       code: "first\nsecond", lang,
     }));
@@ -982,7 +982,7 @@ describe("ChatMarkdown code blocks", () => {
     expect(badge).toContain(`title="${label}"`);
     expect(badge).toContain("min-w-0 truncate");
     expect(html).toContain("flex min-w-0 flex-1 items-center gap-2");
-    expect(html).toMatch(/<span class="[^"]*shrink-0 whitespace-nowrap[^"]*">2 lines<\/span>/);
+    expect(html).toContain('<span class="sr-only">2 lines</span>');
     expect(html).toContain("flex shrink-0 items-center gap-1 whitespace-nowrap");
     expect(html).toContain('aria-label="Copy code to clipboard"');
     expect(html).toContain('aria-label="Wrap long lines"');
@@ -1221,7 +1221,7 @@ describe("bidi: message content carries its own direction", () => {
       ].join("\n"),
     }));
 
-    expect(html).toContain('<div dir="rtl" class="mt-3 text-[18px] font-semibold">');
+    expect(html).toContain('<h1 dir="rtl" class="mt-5 text-[20px] leading-snug font-semibold">');
     expect(html).toContain('<p dir="rtl">');
     expect(html).toContain('<p dir="ltr">An English paragraph');
     expect(html).toContain('<blockquote dir="rtl"');
@@ -1381,16 +1381,15 @@ describe("Simple mode's code block", () => {
     try { return render(); } finally { mode.advanced = true; }
   };
 
-  it("drops the header bar for a quiet surface, with Copy and a ⋯ menu on a hover plate", () => {
+  it("uses the same compact frame and accessible controls in both interface modes", () => {
     const html = simple(() => renderToStaticMarkup(createElement(CodeBlock, { code: "const a = 1;", lang: "js" })));
-    expect(html).toMatch(/class="chat-code-block group\/code relative my-2\.5 overflow-hidden rounded-lg bg-ink\/\[0\.04\]"/);
-    expect(html).not.toContain("border-hairline");
-    expect(html).not.toContain('aria-label="Wrap long lines"');
-    const plate = html.match(/<div data-code-plate="[^"]*" class="([^"]*)"/)?.[1] ?? "";
-    expect(plate.split(" ")).toEqual(expect.arrayContaining(["opacity-0", "group-hover/code:opacity-100", "focus-within:opacity-100", "touch:opacity-100"]));
-    expect(html).toContain('aria-label="Copy code"');
-    expect(html).toContain('aria-label="More"');
-    expect(html).toMatch(/<pre class="[^"]*leading-5 px-3 py-2 text-ink-secondary/);
+    expect(html).toContain("response-code-frame");
+    expect(html).toContain("response-code-header");
+    expect(html).toContain('aria-label="Wrap long lines"');
+    expect(html).toContain('aria-label="Copy code to clipboard"');
+    expect(html).toContain('aria-label="Download snippet as file"');
+    expect(html).not.toContain("data-code-plate");
+    expect(html).toContain("const a = 1;");
   });
 
   it("gives a diagram the same plate instead of its header", () => {

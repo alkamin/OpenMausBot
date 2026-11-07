@@ -30,6 +30,8 @@ export { CodeBlock, HIGHLIGHT_CACHE_MAX, HIGHLIGHT_CACHE_MAX_CHARS, HIGHLIGHT_MA
 import { FilePreviewButton } from "./FilePreviewButton";
 import { SaveIconButton, useHtmlPreview } from "./HtmlFilePreview";
 import { useRevealOriginalMenu } from "./RevealOriginalMenu";
+import { calloutKind, remarkResponseComponents } from "@/lib/response-components";
+import { ResponseCallout, ResponseDetails } from "./ResponseComponents";
 
 const mermaidCache = new Map<string, string>();
 const MERMAID_CACHE_MAX = 50;
@@ -338,7 +340,7 @@ function LocalFileLink({ filePath, name, source, children, message }: { filePath
         : null;
 
   return (
-    <span dir="ltr" className="inline-flex flex-wrap items-center gap-x-1.5 [unicode-bidi:isolate]" {...revealMenu.targetProps(source)}>
+    <span dir="ltr" className="response-file-link inline-flex max-w-full items-center gap-[0.2em] rounded-sm font-medium leading-[normal] text-accent [unicode-bidi:isolate]" {...revealMenu.targetProps(source)}>
       {revealMenu.menu}
       {preview.html
         ? <SaveIconButton name={name ?? fileName(filePath)} save={save} retryable={save.state === "failed" && !save.outsideWorkspace} />
@@ -348,9 +350,9 @@ function LocalFileLink({ filePath, name, source, children, message }: { filePath
         onClick={preview.html ? preview.show : () => void save.save()}
         disabled={!preview.html && save.state === "saving"}
         title={preview.html ? t("html.preview", { name: name ?? fileName(filePath) }) : t("chat.file.saveCopy")}
-        className="inline-flex items-center gap-1 break-words text-start text-accent underline decoration-accent/40 hover:decoration-accent disabled:cursor-wait"
+        className="inline-flex min-w-0 items-center gap-1 break-words text-start text-accent disabled:cursor-wait"
       >
-        {children}
+        <span data-slot="context-chip-label" className="block min-w-0 self-baseline overflow-x-clip text-ellipsis whitespace-nowrap underline decoration-transparent underline-offset-[0.2em]">{children}</span>
         {preview.html ? (
           <Eye size={12} className="shrink-0" aria-hidden="true" />
         ) : save.state === "saving" ? (
@@ -691,34 +693,39 @@ const MARKDOWN_COMPONENTS: Components = {
   p({ node, children }: BlockProps) {
     return <p dir={blockDirection(node)}>{children}</p>;
   },
-  ul({ node, children }: BlockProps) {
-    return <ul dir={blockDirection(node)} className="list-disc space-y-1 ps-5">{children}</ul>;
+  ul({ node, children, className }) {
+    return <ul dir={blockDirection(node)} className={cn("list-disc space-y-1 ps-5", className)}>{children}</ul>;
   },
-  ol({ node, children }: BlockProps) {
-    return <ol dir={blockDirection(node)} className="list-decimal space-y-1 ps-5">{children}</ol>;
+  ol({ node, children, start, className }) {
+    return <ol start={start} dir={blockDirection(node)} className={cn("list-decimal space-y-1 ps-5", className)}>{children}</ol>;
   },
   h1({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-3 text-[18px] font-semibold">{children}</div>;
+    return <h1 dir={blockDirection(node)} className="mt-5 text-[20px] leading-snug font-semibold">{children}</h1>;
   },
   h2({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-2 text-[16px] font-semibold">{children}</div>;
+    return <h2 dir={blockDirection(node)} className="mt-5 text-[18px] leading-snug font-semibold">{children}</h2>;
   },
   h3({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 font-semibold">{children}</div>;
+    return <h3 dir={blockDirection(node)} className="mt-4 text-[16px] leading-snug font-semibold">{children}</h3>;
   },
   h4({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 font-semibold">{children}</div>;
+    return <h4 dir={blockDirection(node)} className="mt-4 font-semibold">{children}</h4>;
   },
   h5({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 text-[14px] font-semibold">{children}</div>;
+    return <h5 dir={blockDirection(node)} className="mt-3 text-[14px] font-semibold">{children}</h5>;
   },
   h6({ node, children }: BlockProps) {
-    return <div dir={blockDirection(node)} className="mt-1.5 text-[14px] font-semibold text-ink-secondary">{children}</div>;
+    return <h6 dir={blockDirection(node)} className="mt-3 text-[14px] font-semibold text-ink-secondary">{children}</h6>;
   },
-  blockquote({ node, children }: BlockProps) {
+  blockquote({ node, children, ...props }) {
+    const kind = calloutKind((props as Record<string, unknown>)["data-response-callout"]);
+    if (kind) return <ResponseCallout kind={kind} direction={blockDirection(node)}>{children}</ResponseCallout>;
     return (
       <blockquote dir={blockDirection(node)} className="border-s-2 border-hairline ps-3 text-ink-secondary">{children}</blockquote>
     );
+  },
+  details({ node: _node, children, open }) {
+    return <ResponseDetails open={open}>{children}</ResponseDetails>;
   },
   del({ children }: { children?: ReactNode }) {
     return <Spoiler>{children}</Spoiler>;
@@ -734,7 +741,7 @@ const NO_THREAD_REFS: ThreadRefsValue = { threads: [] };
 
 // One plugin list for everything every message shares; a message adds mentions only when it has an "@" and thread
 // links only when it may name one, so most messages render the same way whatever the bot list holds.
-const BASE_REMARK_PLUGINS: NonNullable<MarkdownOptions["remarkPlugins"]> = [[remarkGfm, GFM_OPTIONS], remarkMath, remarkWindowsPathDestinations, unwrapLinkedImages, remarkSoftBreaks, remarkGithubRefs];
+const BASE_REMARK_PLUGINS: NonNullable<MarkdownOptions["remarkPlugins"]> = [[remarkGfm, GFM_OPTIONS], remarkMath, remarkWindowsPathDestinations, remarkResponseComponents, unwrapLinkedImages, remarkSoftBreaks, remarkGithubRefs];
 const NO_REHYPE_PLUGINS: NonNullable<MarkdownOptions["rehypePlugins"]> = [];
 let katexPlugins: { plugin: KatexPlugin; list: NonNullable<MarkdownOptions["rehypePlugins"]> } | null = null;
 const rehypePluginsFor = (math: KatexPlugin | null) => {
@@ -805,7 +812,7 @@ function ChatMarkdownComponent({ text, message, mentionPeers = NO_MENTION_PEERS,
   });
   return (
     <MessageScopeContext.Provider value={{ message, imageOffsets, threads, currentBotId, delivered, originals }}>
-      <div className="chat-md min-w-0 [&>*+*]:mt-2">{markdown}</div>
+      <div className="chat-md min-w-0">{markdown}</div>
     </MessageScopeContext.Provider>
   );
 }

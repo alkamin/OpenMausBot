@@ -56,11 +56,11 @@ afterEach(() => {
 describe("sidebar header", () => {
   const collapse = /aria-label="(Collapse sidebar to avatars|Expand sidebar)"|data-sidebar-edge-toggle/;
 
-  it.each(["comfortable", "icons"] as const)("keeps the Inbox and add, and no button collapses or expands it, at %s density in Advanced mode", (density) => {
+  it.each(["comfortable", "icons"] as const)("keeps Inbox, Active Threads and add at %s density in Advanced mode", (density) => {
     fixture.density = density;
     const html = render();
     expect(html).toContain('aria-label="Inbox"');
-    expect(html).not.toContain('aria-label="Active Threads"');
+    expect(html).toContain('aria-label="Active Threads"');
     expect(html).toContain('aria-label="New or share"');
     expect(html).not.toMatch(collapse);
   });
@@ -115,7 +115,7 @@ describe("sidebar top row", () => {
     expect(spacer).toBeGreaterThan(slot);
     expect(switcher).toBeGreaterThan(spacer);
     expect(buttons).toBeGreaterThan(switcher);
-    expect(row.slice(buttons).match(/<button/g)).toHaveLength(1);
+    expect(row.slice(buttons).match(/<button/g)).toHaveLength(2);
     const rowClasses = classesOf(row, "data-sidebar-top-row");
     expect(rowClasses).toEqual(expect.arrayContaining(["relative", "pl-4", "pr-2"]));
     expect(rowClasses).not.toContain("px-4");

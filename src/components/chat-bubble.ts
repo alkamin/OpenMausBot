@@ -29,8 +29,7 @@ export function plainBotBubble(simple: boolean): string {
     : "chat-text w-fit max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl bg-card px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap text-ink";
 }
 
-/** Simple mode's transcript spaces rows 16px apart (ChatView's data-simple-rows); a row in the same group pulls up 12px, to 4px. */
-export const SIMPLE_STACKED = "-mt-3";
+export const SIMPLE_STACKED = "-mt-10";
 
 /** Where a Simple bubble meets its group's neighbours: those corners tighten to 6px on the bubble's own side. */
 export interface BubbleJoin {
@@ -97,8 +96,6 @@ export function bubbleJoins(slots: readonly TranscriptSlot[]): BubbleJoin[] {
   return joins;
 }
 
-/** Simple mode: a card sits 12px under its own bot's bubble, and a bubble 12px under its card, instead of the 16px
- * between senders. Two bubbles join instead, and a stamp between rows keeps the full gap. */
 export function cardTucks(slots: readonly TranscriptSlot[]): boolean[] {
   const tucks = slots.map(() => false);
   let previous: TranscriptSlot | null = null;

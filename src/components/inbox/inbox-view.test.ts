@@ -1,22 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import { approvalRow, inboxView, messageRow, questionRow, reportRow, settledRow } from "@/testing/inbox-fixture";
-import { askOf, choiceResponse, choicesOf, closeResponse, listedRows, quickActions, rowsIn, subjectOf, tabCounts } from "./inbox-view";
+import { askOf, choiceResponse, choicesOf, closeResponse, listedRows, quickActions, rowsIn, subjectOf, tabCounts, waitingCount } from "./inbox-view";
 
 describe("the inbox's lines", () => {
   it("lists what waits on the person and their news as one list, newest first, and leaves settled lines out", () => {
-    expect(listedRows(inboxView()).map((row) => row.id)).toEqual([approvalRow.id, questionRow.id, messageRow.id, reportRow.id]);
-    expect(listedRows(inboxView([reportRow, approvalRow])).map((row) => row.id)).toEqual([approvalRow.id, reportRow.id]);
+    expect(listedRows(inboxView()).map((row) => row.id)).toEqual([approvalRow.id, questionRow.id, messageRow.id]);
+    expect(listedRows(inboxView([reportRow, approvalRow])).map((row) => row.id)).toEqual([approvalRow.id]);
     expect(listedRows(null)).toEqual([]);
   });
 
   it("still knows each line's place, for the chat's card and its counts", () => {
     const view = inboxView();
     expect(rowsIn(view, "needs-you").map((row) => row.id)).toEqual([approvalRow.id, questionRow.id]);
-    expect(rowsIn(view, "info").map((row) => row.id)).toEqual([messageRow.id, reportRow.id]);
+    expect(rowsIn(view, "info").map((row) => row.id)).toEqual([messageRow.id]);
     expect(rowsIn(view, "done").map((row) => row.id)).toEqual([settledRow.id]);
-    expect(tabCounts(view)).toEqual({ "needs-you": 2, info: 2, done: 1 });
+    expect(tabCounts(view)).toEqual({ "needs-you": 2, info: 1, done: 1 });
     expect(tabCounts(null)).toEqual({ "needs-you": 0, info: 0, done: 0 });
+  });
+
+  it("leaves unread reports and notices from an older server out of the list and badge", () => {
+    const view = inboxView([{ ...reportRow, unread: true }, { ...reportRow, id: "notice", kind: "notice", unread: true }]);
+    expect(listedRows(view)).toEqual([]);
+    expect(waitingCount(view)).toBe(0);
+    expect(tabCounts(view)).toEqual({ "needs-you": 0, info: 0, done: 0 });
   });
 
   it("answers only an ask that is still open: news and a settled ask offer no answer", () => {

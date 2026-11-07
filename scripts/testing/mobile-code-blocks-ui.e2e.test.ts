@@ -20,6 +20,8 @@ const snippets = [
 ];
 const reply = [
   "These independent examples have their own controls.",
+  "> [!TIP]\n> Copy and wrap work separately for each example.",
+  "<details>\n<summary>About these examples</summary>\n\nThe examples cover several code-fence formats.\n\n</details>",
   `\`\`\`text\n${snippets[0]}\n\`\`\``,
   `\`\`\`typescript\n${snippets[1]}\n\`\`\``,
   `\`\`\`unrecognised-fixture-language\n${snippets[2]}\n\`\`\``,
@@ -127,6 +129,14 @@ async function connect(url: string) {
     const settled = await runControlOmb(["wait", "--bot", created.bot.id, "--task", created.bot.activeTaskId, "--timeout", "60", "--url", fixture.info.url]);
     receipts.settled = settled;
     await expect.poll(() => evaluate(`${blocks}.length`), { timeout: 30_000 }).toBe(snippets.length);
+    expect(await evaluate("document.querySelectorAll('[data-response-callout=TIP]').length")).toBe(1);
+    expect(await evaluate("document.querySelector('[data-response-details]').open")).toBe(false);
+    await evaluate("document.querySelector('[data-response-details] summary').focus()");
+    await request("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, text: "\r" });
+    await request("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+    await expect.poll(() => evaluate("document.querySelector('[data-response-details]').open")).toBe(true);
+    await evaluate("document.querySelector('[data-response-details]').open = false");
+    receipts.responseComponents = { callout: "TIP", keyboardDisclosure: true };
     await expect.poll(() => evaluate(`${blocks}[1].querySelector('pre')?.classList.contains('shiki')`), { timeout: 30_000 }).toBe(true);
     receipts.highlighted = true;
     await evaluate(`window.fixtureClipboardWrite = navigator.clipboard.writeText.bind(navigator.clipboard); true`);
@@ -175,8 +185,12 @@ async function connect(url: string) {
         for (const button of card.buttons) {
           expect(button.left).toBeGreaterThanOrEqual(card.left);
           expect(button.right).toBeLessThanOrEqual(card.right);
-          expect(button.visibleLabels).toBe(true);
-          if (touch) { expect(button.width).toBeGreaterThanOrEqual(44); expect(button.height).toBeGreaterThanOrEqual(44); }
+          expect(button.label).toBeTruthy();
+          if (touch) {
+            expect(button.visibleLabels).toBe(true);
+            expect(button.width).toBeGreaterThanOrEqual(44);
+            expect(button.height).toBeGreaterThanOrEqual(44);
+          }
         }
       }
       await tap(0, "copy", touch);

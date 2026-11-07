@@ -80,7 +80,7 @@ describe("conversational replies", () => {
     expect([...bubbles[1]!.classList]).toEqual(expect.arrayContaining(["rounded-ss-[6px]", "rounded-es-[6px]"]));
     expect([...bubbles[2]!.classList]).toContain("rounded-ss-[6px]");
     expect([...bubbles[2]!.classList]).not.toContain("rounded-es-[6px]");
-    expect(document.querySelector("[data-conversational-reply]")!.classList).toContain("gap-1");
+    expect(document.querySelector("[data-conversational-reply]")!.classList).toContain("gap-6");
   });
 
   it("plays a reply that arrives while the chat is open in, one bubble after another", async () => {
@@ -113,11 +113,12 @@ describe("conversational replies", () => {
     expect(items.slice(0, 2)).toEqual(["Reply", "Copy message"]);
   });
 
-  it("puts a formatted reply in the bot's bubble in Simple mode, and on the open page in Advanced", async () => {
+  it("puts a formatted reply on the open page in both interface modes", async () => {
     const bubbleOf = () => document.querySelector("[data-mid='m2'] [data-chat-bubble]")!;
     await draw(profile({}));
     expect(bubbleOf().getAttribute("data-chat-bubble")).toBe("simple");
-    expect([...bubbleOf().classList]).toEqual(expect.arrayContaining(["bg-card", "rounded-[18px]"]));
+    expect(bubbleOf().classList).not.toContain("bg-card");
+    expect(bubbleOf().className).toContain("max-w-[min(var(--chat-prose-max),var(--chat-card-pct))]");
     setAdvancedMode(true);
     try {
       await draw(profile({}));

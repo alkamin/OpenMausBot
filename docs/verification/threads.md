@@ -175,6 +175,24 @@ operating-system folder picker.
 
 ## Permanent regression checks
 
+### Delete all threads
+
+```sh
+pnpm exec vitest run src/components/BotMenuDelete.test.ts scripts/testing/delete-all-threads.e2e.test.ts server/bulk-delete-tasks.e2e.test.ts
+```
+
+The deletion fixture creates ordinary conversations, a pinned archived thread,
+and two completed routine runs with the fake engine. It invokes the renderer's
+Delete all threads action against its isolated HTTP server and checks that all
+four threads disappear together, leaving one persisted empty conversation.
+Other bots' conversations remain unchanged. The fixture retains actions,
+bounded transcripts, waits and resulting state beside its printed server log.
+This checks the renderer action and server lifecycle; it does not drive the
+confirmation dialog in a browser. Unit checks cover the confirmation count and
+running-run copy, and the bulk-delete API fixture checks running-thread refusal.
+
+### Independent threads
+
 ```sh
 pnpm exec vitest run server/independent-threads-api.test.ts server/paired-thread-targets-api.test.ts server/direct-screen-settlement-api.test.ts server/bot-projects-api.test.ts server/thread-capacity-api.test.ts src/components/BotThreads.test.ts src/components/BotProjects.test.ts src/components/ThreadConcurrencySettings.test.ts src/components/ComposerQueuedMessages.test.ts src/lib/folder-order.test.ts src/state/store.test.ts
 ```
@@ -190,3 +208,24 @@ print retained JSON evidence paths next to the server logs.
 
 Stop the foreground launcher with Ctrl-C. It closes only its own UI/server
 and deletes its disposable home; the printed server log remains available.
+
+## Short topic labels
+
+New direct and channel conversations generate a short topic summary for their
+thread title by default: three to six words, at most 48 characters, in the
+conversation's language. Titles the person chooses remain unchanged. Existing
+direct chats can use **Regenerate title** to summarize the recent conversation.
+An unavailable or failed generator retains the opening-message fallback;
+`features.llmThreadTitles: false` explicitly disables generation.
+
+```sh
+pnpm exec vitest run server/thread-title.test.ts server/thread-title-regenerate.e2e.test.ts server/tasks.test.ts scripts/control-omb.test.ts src/components/SidebarThreadRow.test.ts server/main-thread.e2e.test.ts
+```
+
+Verified on 2026-11-06 with the standard isolated fake-engine fixture. The
+checks cover default generation for direct and channel chats, persisted titles,
+custom names, regenerating an existing chat, failure fallback, explicit opt-out,
+and thread navigation. The title fixture retains HTTP actions, bounded
+transcripts, wait results and resulting titles beside its printed server log.
+The fake engine verifies routing and persistence; it does not measure a real
+model's summary quality or exercise native desktop rendering.

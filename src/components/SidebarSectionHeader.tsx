@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
 
 import { cn } from "@/lib/cn";
@@ -21,6 +21,8 @@ export function SidebarSectionHeader({
   onDragEnd,
   onMove,
   onDelete,
+  onManageBots,
+  hasBots = false,
   onContextMenu,
   line = false,
   onMenu,
@@ -40,6 +42,8 @@ export function SidebarSectionHeader({
   onDragEnd?: () => void;
   onMove?: (direction: -1 | 1) => void;
   onDelete?: () => void;
+  onManageBots?: () => void;
+  hasBots?: boolean;
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
   line?: boolean;
   onMenu?: (button: HTMLButtonElement) => void;
@@ -73,6 +77,19 @@ export function SidebarSectionHeader({
       : t("sidebar.section.collapse", { name });
 
   const dropMark = dropInto ? "bg-accent/10 outline outline-2 -outline-offset-2 outline-accent/70" : undefined;
+
+  const manageBotsLabel = t(hasBots ? "team.manageBotsIn" : "team.addBotsTo", { name });
+  const manageBotsButton = onManageBots && !naming && (
+    <button
+      type="button"
+      onClick={onManageBots}
+      aria-label={manageBotsLabel}
+      title={manageBotsLabel}
+      className="flex size-6 shrink-0 items-center justify-center rounded text-ink-secondary hover:bg-raised hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      <Plus size={13} aria-hidden="true" />
+    </button>
+  );
 
   if (line) {
     const tail = (
@@ -114,6 +131,7 @@ export function SidebarSectionHeader({
             {tail}
           </div>
         )}
+        {manageBotsButton}
         {onMenu && !naming && (
           <button
             type="button"
@@ -157,6 +175,7 @@ export function SidebarSectionHeader({
           {attentionLabel && <span className="sr-only">{attentionLabel}</span>}
         </div>
       )}
+      {manageBotsButton}
       {onDelete && !naming && (
         <button
           type="button"

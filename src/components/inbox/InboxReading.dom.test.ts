@@ -42,7 +42,7 @@ const why: InboxRow = {
   card: { title: "A question", subtitle: "Why are we doing it?", options: ["Trust and data control", "Open-source adoption"], requestId: "req-q2", requestType: "question" },
 };
 const news: InboxRow = {
-  id: "n1", kind: "result", tab: "info", unread: false, at: AT - 2, from: { name: "Reporter", botId: "reporter" },
+  id: "n1", kind: "message", tab: "info", unread: false, at: AT - 2, from: { name: "Reporter", botId: "reporter" },
   origin: { botId: "reporter", threadId: "rep-daily", title: "Daily digest", messageId: "n1" }, text: "Daily digest: 3 new leads.",
 };
 const placeView = (rows: InboxRow[]): InboxView => ({ botId: null, threadId: null, rows, anchor: null });

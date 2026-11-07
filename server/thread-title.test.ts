@@ -67,17 +67,18 @@ describe("threadTitlePrompt", () => {
     const prompt = threadTitlePrompt(`User: fix the login\n${"x".repeat(5_000)}`, "conversation");
     expect(prompt).toContain("what it is about now");
     expect(prompt).toContain("Conversation:\nUser: fix the login");
-    expect(prompt.length).toBeLessThan(TITLE_INPUT_MAX_CHARS + 300);
+    expect(prompt).toContain("Summarize the topic or goal for a sidebar label");
+    expect(prompt).toContain("conversation's language and at most 48 characters");
+    expect(prompt.length).toBeLessThan(TITLE_INPUT_MAX_CHARS + 500);
   });
 });
 
 describe("a Live call's title", () => {
   it("asks for it from the call's requests", () => {
     const prompt = threadTitlePrompt("what is the weather in Pune\nand tomorrow?", "call");
-    expect(prompt.split("\n").slice(0, 3)).toEqual([
+    expect(prompt.split("\n").slice(0, 2)).toEqual([
       "Name the voice call below by what was asked on it.",
       "Reply with only a short title: 3 to 6 words, plain text, no quotes, no trailing period.",
-      "Requests:",
     ]);
     expect(prompt.endsWith("Requests:\nwhat is the weather in Pune\nand tomorrow?")).toBe(true);
   });

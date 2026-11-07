@@ -14,6 +14,7 @@ export function splitConversationalReply(text: string): string[] {
   const parts: string[] = [];
   let current: string[] = [];
   let fence: string | null = null;
+  let detailsDepth = 0;
   const flush = () => {
     // Leading indentation can make a code block, so only trailing space goes.
     const block = current.join("\n").trimEnd();
@@ -34,6 +35,12 @@ export function splitConversationalReply(text: string): string[] {
     if (open) {
       fence = open[1];
       current.push(line);
+      continue;
+    }
+    if (/^ {0,3}<details(?:\s+open)?\s*>/i.test(line)) detailsDepth++;
+    if (detailsDepth > 0) {
+      current.push(line);
+      if (/^ {0,3}<\/details>\s*$/i.test(line)) detailsDepth--;
       continue;
     }
     if (!line.trim()) flush();

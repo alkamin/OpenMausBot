@@ -124,7 +124,7 @@ describe("message_person", () => {
     await f.team.internal({ method: "POST", path: "/api/internal/people/message", res: {} as never, botId: "scout", threadId: "scout-main",
       json: ((_res: unknown, status: number, body: unknown) => { answered = { status, body }; }) as never, readBody: async () => ({ to: "Ben", message: "Hi" }) });
     expect(answered).toMatchObject({ status: 404 });
-    expect(f.team.prompt("scout", "scout-main", true)).toBe("");
+    expect(f.team.prompt("scout", "scout-main", true)).toContain("tag them with @you");
     f.said("scout-main", "@Ben look", CLEO);
     expect(f.notified).toEqual([]);
     expect(f.team.inbox.home(key(BEN.email))).toBeNull();
@@ -198,6 +198,24 @@ describe("@Ben", () => {
     const second = f.store.appendMessage("scout-main", { role: "bot", kind: "text", text: "Told @Ben.", turnId: "t4" });
     f.store.patchMessage("scout-main", second.id, { turnSucceeded: true });
     f.said("scout-main", "Note to self @Cleo", CLEO);
+    expect(f.notified.map((one) => one.forPerson)).toEqual([key(BEN.email)]);
+  });
+
+  it("routes @you to the person in this conversation, alongside named tags", () => {
+    const f = fixture();
+    const reply = f.store.appendMessage("ben-private", { role: "bot", kind: "text", text: "@you please review the page. @Ben this needs your decision.", turnId: "t-you" });
+    f.store.patchMessage("ben-private", reply.id, { turnSucceeded: true });
+    expect(f.notified.map((one) => one.forPerson)).toEqual([key(BEN.email)]);
+    expect(f.team.view(session(BEN.email))?.rows).toEqual([expect.objectContaining({ text: expect.stringContaining("@you please review"), origin: expect.objectContaining({ threadId: "ben-private" }) })]);
+  });
+
+  it("keeps a channel's @you with the person who asked when somebody else writes during the turn", () => {
+    const f = fixture();
+    const request = f.said("room-thread", "Please draft the page.", BEN);
+    f.said("room-thread", "Another question for later.", CLEO);
+    const reply = f.store.appendMessage("room-thread", { role: "bot", kind: "text", text: "@you please review the draft.", turnId: "t-original", requestMessageId: request.id,
+      from: { botId: "scout", name: "Scout", color: "blue" } });
+    f.store.patchMessage("room-thread", reply.id, { turnSucceeded: true });
     expect(f.notified.map((one) => one.forPerson)).toEqual([key(BEN.email)]);
   });
 });
@@ -274,8 +292,18 @@ describe("what a bot is told", () => {
     expect(own).not.toContain('"Cleo"');
     expect(own).not.toContain("Carl");
     expect(own).toContain("already reached Bob's inbox by itself");
-    expect(f.team.prompt("scout", "cleo-private", false)).toBe("");
+    expect(f.team.prompt("scout", "cleo-private", false)).toContain("tag them with @you");
     expect(f.audiences.get("ben-private")).toBe(memberAudience(key(BEN.email)));
     expect(CARL.leftAt).toBe(5);
+  });
+
+  it("teaches tags for action in direct chats with or without tools and off a team", () => {
+    const f = fixture({ team: false });
+    for (const tools of [false, true]) {
+      const prompt = f.team.prompt("scout", "scout-main", tools);
+      expect(prompt).toContain("tag them with @you");
+      expect(prompt).toContain("specific request");
+      expect(prompt).toContain("routine progress and completion updates stay in the chat");
+    }
   });
 });

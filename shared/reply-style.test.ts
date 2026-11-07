@@ -39,6 +39,11 @@ describe("splitConversationalReply", () => {
   it("returns nothing for blank text", () => {
     expect(splitConversationalReply("  \n\n ")).toEqual([]);
   });
+
+  it("keeps nested details and their code fences together", () => {
+    const details = "<details>\n<summary>Evidence</summary>\n\nA paragraph.\n\n<details>\n<summary>More</summary>\n\n```html\n</details>\n```\n\n</details>\n\n</details>";
+    expect(splitConversationalReply(`Answer.\n\n${details}\n\nConclusion.`)).toEqual(["Answer.", details, "Conclusion."]);
+  });
 });
 
 describe("isConversational", () => {

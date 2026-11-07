@@ -35,7 +35,7 @@ export function ConversationalReply({ segments, firstNew, citation, renderSegmen
   join?: BubbleJoin;
 }) {
   return (
-    <div data-conversational-reply className="flex w-full flex-col items-start gap-1" data-citation-source={citation.messageId} data-citation-owner-type="bot" data-citation-owner={citation.botId} data-citation-thread={citation.threadId}>
+    <div data-conversational-reply className="flex w-full flex-col items-start gap-6" data-citation-source={citation.messageId} data-citation-owner-type="bot" data-citation-owner={citation.botId} data-citation-thread={citation.threadId}>
       {segments.map((segment, index) => (
         <div
           key={index}

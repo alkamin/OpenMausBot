@@ -38,6 +38,8 @@ export interface InboxTask {
  * asked), "info" for news until they answer it or mark it done, "done" once it is settled or marked done. */
 export type InboxTab = "needs-you" | "info" | "done";
 
+export const isInboxRequest = (item: Pick<InboxItem, "kind">): boolean => item.kind === "message" || item.kind === "ask";
+
 /** One line of a person's inbox as their inbox lists it, newest first. `kind` names its source; a new source adds a kind
  * of its own with what its row needs. */
 export interface InboxRow {

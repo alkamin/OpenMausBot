@@ -11,12 +11,16 @@ const resourcesDir = path.join(electronDir, "resources");
 export const speechHelperBundle = path.join(resourcesDir, "OpenMausBot Speech.app");
 export const speechHelperBinary = path.join(speechHelperBundle, "Contents", "MacOS", "speech-helper");
 
-export function buildSpeechHelper() {
+export function buildSpeechHelper(arches = ["arm64", "x64"]) {
   const contents = path.join(speechHelperBundle, "Contents");
   mkdirSync(path.join(contents, "MacOS"), { recursive: true });
   copyFileSync(path.join(resourcesDir, "speech-helper-Info.plist"), path.join(contents, "Info.plist"));
-  // Universal, since the helper rides in both arm64 and x64 apps and bare `swiftc` builds host-arch only. macos12 = LSMinimumSystemVersion.
-  const slices = ["arm64", "x86_64"].map((arch) => {
+  const targets = arches.map((arch) => {
+    const target = { arm64: "arm64", x64: "x86_64" }[arch];
+    if (!target) throw new Error(`Unsupported speech helper architecture: ${arch}`);
+    return target;
+  });
+  const slices = targets.map((arch) => {
     const slice = `${speechHelperBinary}-${arch}`;
     execFileSync(
       "swiftc",
@@ -31,8 +35,8 @@ export function buildSpeechHelper() {
   });
   for (const slice of slices) rmSync(slice, { force: true });
   const archs = execFileSync("lipo", ["-archs", speechHelperBinary], { timeout: 60_000 }).toString();
-  if (!archs.includes("arm64") || !archs.includes("x86_64")) {
-    throw new Error(`speech helper is not universal: ${archs.trim()}`);
+  if (targets.some((arch) => !archs.trim().split(/\s+/).includes(arch))) {
+    throw new Error(`speech helper is missing a requested architecture: ${archs.trim()}`);
   }
   // Ad-hoc signed for dev with the release's audio entitlement; electron-builder replaces it when signing.
   execFileSync(
@@ -53,5 +57,6 @@ export function buildSpeechHelper() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  buildSpeechHelper();
+  const { resolveCuaMacArches } = await import("../scripts/cua-mac-arches.mjs");
+  buildSpeechHelper(resolveCuaMacArches());
 }

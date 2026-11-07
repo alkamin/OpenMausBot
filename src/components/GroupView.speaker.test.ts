@@ -55,9 +55,10 @@ describe("room speaker names", () => {
       line("u2", "user", "and the other one"),
       line("k", "bot", "here", { botId: "kai", name: "Kai", color: "orange" }),
     ]);
-    expect(html.match(/data-bot-color="blue"/g)).toHaveLength(1);
+    expect(html.match(/data-bot-color="blue"/g)).toHaveLength(2);
     expect(html.match(/data-bot-color="orange"/g)).toHaveLength(1);
-    expect(html).toContain('class="text-[11px] font-medium bot-identity" data-bot-color="blue"');
+    expect(html).toContain('class="truncate text-[13px] font-semibold bot-identity" data-bot-color="blue"');
+    expect(html.match(/data-bot-author="ada"/g)).toHaveLength(2);
     expect(html).toContain(">Ada<");
     expect(html).toContain(">Kai<");
     expect(html).toContain("var(--identity-blue)");

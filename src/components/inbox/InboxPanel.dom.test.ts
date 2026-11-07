@@ -54,7 +54,7 @@ describe("the inbox panel", () => {
     await mount(createElement(InboxPanel));
     expect(document.querySelector("[role=tablist], [data-inbox-tab]")).toBeNull();
     const listed = () => [...document.querySelectorAll<HTMLElement>("[data-inbox-row]")].map((row) => row.dataset.inboxRow);
-    expect(listed()).toEqual([approvalRow.id, questionRow.id, messageRow.id, reportRow.id]);
+    expect(listed()).toEqual([approvalRow.id, questionRow.id, messageRow.id]);
     expect(listed(), "a settled line is not listed again").not.toContain(settledRow.id);
     expect([...document.querySelectorAll<HTMLElement>("[data-inbox-row] [data-inbox-waits]")].map((dot) => dot.closest<HTMLElement>("[data-inbox-row]")!.dataset.inboxRow)).toEqual([approvalRow.id, questionRow.id]);
     expect(document.querySelector(`[data-inbox-row="${approvalRow.id}"]`)!.hasAttribute("data-unread")).toBe(true);
@@ -63,7 +63,7 @@ describe("the inbox panel", () => {
     expect(server.calls).toContainEqual({ path: `/api/inbox/${messageRow.id}/read`, method: "POST" });
     expect(document.querySelector("textarea"), "a message that waits on an answer takes a reply").not.toBeNull();
     await click('[aria-label="Back to the list"]');
-    expect(listed()).toEqual([approvalRow.id, questionRow.id, messageRow.id, reportRow.id]);
+    expect(listed()).toEqual([approvalRow.id, questionRow.id, messageRow.id]);
   });
 
   it("answers an ask from its row through the copy's own card, as the chat's buttons do, and marks news done", async () => {
@@ -73,9 +73,9 @@ describe("the inbox panel", () => {
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "decideRequest", threadId: "inbox", requestId: "req-approval", behavior: "allow" }));
     await click(`[data-inbox-row="${questionRow.id}"] [data-inbox-action="close"]`);
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "decideRequest", threadId: "inbox", requestId: "req-question", behavior: "answer" }));
-    await click(`[data-inbox-row="${reportRow.id}"] [data-inbox-action="done"]`);
-    expect(server.calls).toContainEqual({ path: `/api/inbox/${reportRow.id}/done`, method: "POST" });
-    expect(document.querySelector(`[data-inbox-row="${reportRow.id}"]`), "it leaves the list at once").toBeNull();
+    await click(`[data-inbox-row="${messageRow.id}"] [data-inbox-action="done"]`);
+    expect(server.calls).toContainEqual({ path: `/api/inbox/${messageRow.id}/done`, method: "POST" });
+    expect(document.querySelector(`[data-inbox-row="${messageRow.id}"]`), "it leaves the list at once").toBeNull();
   });
 
   it("is a sheet at phone width", async () => {
@@ -93,7 +93,7 @@ describe("the inbox's card in the chat", () => {
   it("sits once, under the newest line that needed the person, and opens the inbox", async () => {
     await mount(lines([settledRow.id, reportRow.id, messageRow.id, questionRow.id, approvalRow.id]));
     expect(document.querySelectorAll("[data-inbox-card]")).toHaveLength(1);
-    expect(document.querySelector('[data-inbox-card="open"]')!.getAttribute("aria-label")).toBe("2 need you · 2 for your info");
+    expect(document.querySelector('[data-inbox-card="open"]')!.getAttribute("aria-label")).toBe("2 need you · 1 for your info");
     expect([...document.querySelectorAll("[data-inbox-card] [data-inbox-row]")].map((row) => (row as HTMLElement).dataset.inboxRow)).toEqual([approvalRow.id, questionRow.id]);
     expect([...document.querySelectorAll('[data-inbox-card] [data-inbox-action="allow"]')].filter((button) => !button.closest("[data-inbox-row]")),
       "the line the card sits under answers on its own card").toEqual([]);
@@ -109,7 +109,7 @@ describe("the inbox's card in the chat", () => {
     const caughtUp = inboxView([messageRow, reportRow, { ...settledRow }]);
     shown({ ...caughtUp, anchor: settledRow.id });
     await mount(lines([settledRow.id, reportRow.id, messageRow.id]));
-    expect(document.querySelector('[data-inbox-card="caught-up"]')?.textContent).toContain("All caught up · 2 for your info");
+    expect(document.querySelector('[data-inbox-card="caught-up"]')?.textContent).toContain("All caught up · 1 for your info");
     const later = { ...approvalRow, id: "line-later" };
     await act(async () => { shown({ ...inboxView([later, messageRow, reportRow, settledRow]), anchor: later.id }); });
     await mount(lines([settledRow.id, reportRow.id, messageRow.id, later.id]));

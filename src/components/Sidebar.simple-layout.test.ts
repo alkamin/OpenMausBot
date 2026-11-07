@@ -171,11 +171,12 @@ describe("Simple-mode sidebar layout", () => {
     expect(footer(advanced.tree)).toBe(false);
   });
 
-  it("still offers Add bots under an empty team", () => {
+  it("offers Add bots in an empty team heading", () => {
     fixture.state = { ...fixture.state, sections: ["Work", "Empty"] };
     const { tree } = render();
     expect(headers(tree).map((header) => header.props.name)).toEqual(["Group chats", "Work", "Empty"]);
-    expect(labelled(tree, "Add bots to Empty")).toBe(true);
+    expect(headers(tree).find((header) => header.props.name === "Empty")!.props.onManageBots).toBeTypeOf("function");
+    expect(labelled(tree, "Add bots to Empty")).toBe(false);
     expect(labelled(tree, "Add or remove bots in Work")).toBe(false);
   });
 
@@ -190,7 +191,9 @@ describe("Simple-mode sidebar layout", () => {
       expect(header.props.onMenu).toBeUndefined();
     }
     expect(all[2]!.props.onDelete).toBeTypeOf("function");
-    expect(labelled(tree, "Add or remove bots in Work")).toBe(true);
+    expect(all[2]!.props.onManageBots).toBeTypeOf("function");
+    expect(all[2]!.props.hasBots).toBe(true);
+    expect(labelled(tree, "Add or remove bots in Work")).toBe(false);
   });
 
   it("opens the team menu from the line's ⋯ button, under it, with every team action", () => {

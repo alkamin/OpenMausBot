@@ -11,7 +11,7 @@ import { z } from "zod";
 
 import { nameFromEmail, ownerEmail } from "../../shared/bot-owner.ts";
 import type { Notification } from "../../shared/notification.ts";
-import { mentionablePeople, teammateMentions } from "../../shared/person-mention.ts";
+import { mentionablePeople, PERSON_TAG, teammateMentions } from "../../shared/person-mention.ts";
 import type { InboxView } from "../../shared/inbox.ts";
 import type { NeedsYouItem } from "../../shared/today.ts";
 import type { ResolvedSender } from "../../shared/wire.ts";
@@ -119,10 +119,11 @@ export function createTeamMessages(deps: TeamMessagesDeps) {
   }
 
   /** Who a turn here speaks for: a private chat's own person, else whoever wrote in it last. */
-  function askerOf(threadId: string): Person | undefined {
+  function askerOf(threadId: string, requestMessageId?: string): Person | undefined {
     const member = audienceMember(deps.audienceOf(threadId));
     if (member) return byKey(member);
-    return byKey(store.activePath(threadId).findLast((message) => message.role === "user" && !message.peerAsk && message.sender?.id)?.sender?.id);
+    return byKey(store.activePath(threadId).findLast((message) => message.role === "user" && !message.peerAsk && message.sender?.id
+      && (!requestMessageId || message.id === requestMessageId))?.sender?.id);
   }
 
   /** A teammate by name or address. Someone who left is found too, so the refusal can say so. */
@@ -254,8 +255,10 @@ export function createTeamMessages(deps: TeamMessagesDeps) {
     const at: Where = group ? { bot: speaker, group } : { bot: speaker };
     const texts = store.activePath(threadId).filter((message) => message.role === "bot" && message.kind === "text" && message.turnId === line.turnId
       && !message.inbox && (!group || message.from?.botId === speaker.id));
+    const asker = askerOf(threadId, line.requestMessageId);
+    const people = mentionable().map((one) => one.key === asker?.key ? { ...one, names: [...one.names, PERSON_TAG] } : one);
     for (const text of texts) {
-      for (const hit of teammateMentions(text.text ?? "", mentionable(), botNames())) {
+      for (const hit of teammateMentions(text.text ?? "", people, botNames())) {
         const to = byKey(hit.key);
         if (!to || told.has(to.key) || !deps.sees(to).thread(threadId)) continue;
         told.add(to.key);
@@ -336,9 +339,9 @@ export function createTeamMessages(deps: TeamMessagesDeps) {
       const tags = new Map(mentionable().map((person) => [person.key, person.names]));
       return current().map((one) => ({ name: one.name, tags: tags.get(one.key) ?? [] }));
     },
-    /** What a turn here is told about the team's people and message_person; empty off a team or without the tool. */
     prompt(_botId: string, threadId: string, tools: boolean): string {
-      if (!team || !tools) return "";
+      const attention = "\n\nWhen you need the person's answer, decision or action, tag them with @you in your reply and state the specific request. The tag puts that message in their Inbox and their reply comes back to this conversation. Reserve tags for requests that need their attention; routine progress and completion updates stay in the chat. Use the approval or question card when one is appropriate; those also appear in the Inbox.\n";
+      if (!team || !tools) return attention;
       const own = audienceMember(deps.audienceOf(threadId));
       const others = current().filter((one) => one.key !== own);
       const shown = others.slice(0, PROMPT_PEOPLE).map((one) => `${JSON.stringify(oneLine(one.name, 80))}${one.role === "member" ? "" : ` (${one.role})`}`).join(", ");
@@ -346,7 +349,7 @@ export function createTeamMessages(deps: TeamMessagesDeps) {
       const people = others.length
         ? `\n\nThe people in ${team.name} (the names they chose): ${shown}${more}. To get a message to one of them, call message_person with their name and the message: it reaches their inbox, and their answer comes back here for you to carry on with. "Tell Bob …" or "let Bob know …" asks you to do it; then say so in a few words. Only your message goes, never this conversation, so write it to make sense on its own. A line that tags @Bob already reached Bob's inbox by itself: don't pass it on again.`
         : "";
-      const text = people + inboxPrompt(threadId, own);
+      const text = attention + people + inboxPrompt(threadId, own);
       return text ? `${text}\n` : "";
     },
     /** The asks that have waited on this inbox's person for more than a day, for a turn in that inbox; empty anywhere else. */

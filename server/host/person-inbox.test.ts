@@ -56,6 +56,9 @@ describe("asks routed to a person", () => {
     expect(f.lines(inbox.threadId)[0]).toMatchObject({ text: "Daily digest: 3 new leads.", inbox: { kind: "result", origin: { threadId: "ben-private", title: "Ben and Scout" } } });
     f.team.route({ kind: "routine-failed", botId: "reporter", botName: "Reporter", threadId: "rep-main", title: "Reporter's routine failed", body: "Timed out" });
     expect(f.lines(inbox.threadId)[1]).toMatchObject({ inbox: { kind: "notice", from: { name: "Reporter" } } });
+    expect(f.team.view(session(BEN.email))?.rows).toEqual([]);
+    expect(f.team.count(session(BEN.email))).toBe(0);
+    expect(f.team.inbox.unseen(key(BEN.email))).toEqual([]);
   });
 
   it("brings work handed on from Ben's chat that waits on him, though it runs in a chat of his own", () => {
@@ -180,7 +183,7 @@ describe("the inbox as its panel lists it", () => {
     expect(view.rows[0]).toMatchObject({ kind: "ask", tab: "needs-you", unread: true, card: { requestId: "req-2", tool: "Bash" }, from: { name: "Reporter" } });
     expect(view.anchor, "the card in the chat sits under the newest ask").toBe(view.rows[0]!.id);
     expect(tabs(f)).toEqual({
-      "Can you review the deck?": "info", "The Q4 draft is ready.": "info", "Daily digest: 3 new leads.": "info",
+      "Can you review the deck?": "info", "The Q4 draft is ready.": "info",
       "Run: rm -rf ./build": "needs-you",
     });
     expect(view.rows.filter((row) => row.tab === "needs-you")).toHaveLength(2);
@@ -188,13 +191,13 @@ describe("the inbox as its panel lists it", () => {
     f.store.patchMessage("rep-shared", approval.id, { card: { ...approve("req-1"), answered: "allow" } });
     const deck = view.rows.find((row) => row.text === "Can you review the deck?")!;
     f.team.replyIn(session(BEN.email), inbox, deck.id, "Tonight.", {});
-    const report = view.rows.find((row) => row.text === "Daily digest: 3 new leads.")!;
-    expect(f.team.inbox.markDone(key(BEN.email), report.id)).toBe("done");
+    const draft = view.rows.find((row) => row.text === "The Q4 draft is ready.")!;
+    expect(f.team.inbox.markDone(key(BEN.email), draft.id)).toBe("done");
     expect(f.team.inbox.markDone(key(BEN.email), view.rows[0]!.id), "an open ask is settled by answering it").toBe("an ask");
-    expect(f.team.inbox.markDone(key(CLEO.email), report.id), "only its own person").toBe("unknown");
+    expect(f.team.inbox.markDone(key(CLEO.email), draft.id), "only its own person").toBe("unknown");
     const after = f.team.inbox.view(key(BEN.email))!.rows;
     expect(after.filter((row) => row.tab === "needs-you").map((row) => row.card?.requestId)).toEqual(["req-2"]);
-    expect(after.filter((row) => row.tab === "info").map((row) => row.text)).toEqual(["The Q4 draft is ready."]);
+    expect(after.filter((row) => row.tab === "info")).toEqual([]);
     expect(after.filter((row) => row.tab === "done")).toHaveLength(3);
     expect(f.team.inbox.openAsks(inbox), "the badge counts what Needs you lists").toBe(1);
   });

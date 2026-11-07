@@ -8,13 +8,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 
-import type { InboxItem, InboxRow, InboxView } from "../../shared/inbox.ts";
+import { isInboxRequest, type InboxItem, type InboxRow, type InboxView } from "../../shared/inbox.ts";
 import type { Notification } from "../../shared/notification.ts";
+import { personMentionExcerpt } from "../../shared/person-mention.ts";
 import { personWait, type PersonWait } from "../../shared/person-wait.ts";
 import type { OptionCardData } from "../../shared/wire.ts";
 import { ASK_NOTIFICATIONS } from "../ask-routing.ts";
 import { writeFileAtomic } from "../atomic.ts";
 import type { RequestAuth } from "../request-auth.ts";
+import { buildNotification } from "../notify.ts";
 import { conversationLanguage, serverLine } from "../server-lines.ts";
 import type { Message, Store, StoreChange } from "../store.ts";
 import { clip, oneLine } from "./text-clip.ts";
@@ -57,7 +59,8 @@ export function placeInboxViewer(auth: RequestAuth, cloud: { personal: boolean; 
 
 export interface PlaceInboxDeps {
   dataDir: string;
-  store: Pick<Store, "bot" | "botByThread" | "taskByThread" | "groupByThread" | "appendMessage" | "patchTask" | "patchGroup" | "messagesFor" | "onChange">;
+  store: Pick<Store, "bots" | "bot" | "botByThread" | "taskByThread" | "groupByThread" | "appendMessage" | "patchTask" | "patchGroup" | "messagesFor" | "activePath" | "onChange">;
+  profileName?(): string | undefined;
   openCards(): OpenCardRow[];
   viewer(auth: RequestAuth): InboxViewer;
   sees(auth: RequestAuth, threadId: string): boolean;
@@ -175,7 +178,7 @@ export function createPlaceInbox(deps: PlaceInboxDeps) {
   });
 
   function view(auth: RequestAuth): InboxView {
-    const rows = [...askRows(auth), ...lines.filter((line) => lineFor(auth, line)).map(lineRow)].sort((a, b) => b.at - a.at).slice(0, VIEW_ROWS);
+    const rows = [...askRows(auth), ...lines.filter((line) => isInboxRequest(line) && lineFor(auth, line)).map(lineRow)].sort((a, b) => b.at - a.at).slice(0, VIEW_ROWS);
     return { botId: null, threadId: null, rows, anchor: null };
   }
 
@@ -226,7 +229,28 @@ export function createPlaceInbox(deps: PlaceInboxDeps) {
     return notification;
   }
 
+  function tagged(threadId: string, terminal: Message): void {
+    if (!terminal.turnId || terminal.turnSucceeded !== true) return;
+    const group = store.groupByThread(threadId);
+    const bot = terminal.from?.botId ? store.bot(terminal.from.botId) : store.botByThread(threadId);
+    if (!bot || (group && !group.memberIds.includes(bot.id))) return;
+    const botNames = store.bots.filter((one) => !one.hidden).map((one) => one.name);
+    const texts = store.activePath(threadId).filter((one) => one.role === "bot" && one.kind === "text" && one.turnId === terminal.turnId
+      && !one.inbox && (!group || one.from?.botId === bot.id));
+    const hit = texts.map((one) => ({ one, excerpt: personMentionExcerpt(one.text ?? "", { profileName: deps.profileName?.(), botNames }) })).find((one) => one.excerpt);
+    if (!hit || lines.some((line) => line.id === hit.one.id)) return;
+    const guest = deps.guestOf(threadId);
+    const handed = workingFor(threadId);
+    addLine({ id: hit.one.id, botId: bot.id, threadId, ...(group ? { groupId: group.id } : {}), kind: "message", from: bot.name.slice(0, 200),
+      ...(guest ? { guest } : {}), ...(handed ? { workingFor: handed } : {}), text: clip(hit.excerpt!, NOTICE_TEXT_MAX), at: hit.one.at });
+    if (group) store.patchGroup(group.id, { unread: true });
+    else store.patchTask(bot.id, threadId, { unread: true });
+    const notification = !guest && buildNotification("mention", bot, threadId, hit.excerpt!, { avatarUrl: bot.avatarUrl, ...(group ? { group } : {}) });
+    if (notification) deps.send(notification);
+  }
+
   const unsubscribe = store.onChange((change: StoreChange) => {
+    if (change.type === "message.patch" && change.message.role === "bot" && change.message.kind === "text") tagged(change.threadId, change.message);
     if (change.type !== "thread.deleted") return;
     const before = lines.length;
     lines = lines.filter((line) => line.threadId !== change.threadId);

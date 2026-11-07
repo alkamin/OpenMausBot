@@ -81,6 +81,11 @@ describe("an automation's line in the chat", () => {
     expect(label?.textContent).toContain("Inbox brief");
     expect(label?.querySelector("time")?.getAttribute("datetime")).toBe(new Date(at(0)).toISOString());
     expect(document.querySelector('[data-mid="r1"]')?.textContent).toContain("Acme replied about the order.");
+    const report = document.querySelector('[data-automation-report="run-1"]');
+    expect(report?.contains(label!)).toBe(true);
+    expect(report?.textContent).toContain("Acme replied about the order.");
+    expect(report?.textContent).not.toContain("Here is the draft.");
+    expect(label?.textContent).toContain(t("chat.automation.report"));
     const open = label?.querySelector<HTMLButtonElement>("button");
     expect(open?.textContent).toBe(t("chat.automation.openRun"));
     dispatch.mockClear();

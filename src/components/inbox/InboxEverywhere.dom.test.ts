@@ -54,7 +54,7 @@ const mount = (child: ReactElement, bots: Bot[] = []) => act(async () => {
     { value: { state: { ...initialState, bots } as AppState, dispatch, flushBotPatches: vi.fn(), refreshInstances: vi.fn(), refreshModels: vi.fn() } as never }, child));
 });
 const click = (selector: string) => act(async () => { document.querySelector<HTMLElement>(selector)!.click(); });
-const row = (props: Partial<Parameters<typeof SidebarInboxRow>[0]> = {}) => createElement(SidebarInboxRow, { icons: false, large: false, running: false, ...props });
+const row = (props: Partial<Parameters<typeof SidebarInboxRow>[0]> = {}) => createElement(SidebarInboxRow, { icons: false, large: false, ...props });
 const inboxButton = () => document.querySelector<HTMLElement>("[data-sidebar-inbox]");
 
 beforeEach(() => {
@@ -94,16 +94,14 @@ describe("the Inbox row", () => {
     expect(document.querySelector("[data-inbox-count]")).toBeNull();
   });
 
-  it("opens and closes the inbox, and shows a dot while a bot is at work", async () => {
+  it("opens and closes the inbox without a running-work indicator", async () => {
     setInboxView(placeView([]));
-    await mount(row({ running: true }));
-    expect(document.querySelector("[data-inbox-running]")).not.toBeNull();
+    await mount(row());
+    expect(document.querySelector("[data-inbox-running]")).toBeNull();
     await click("[data-sidebar-inbox]");
     expect(currentInboxPanel().open).toBe(true);
     await click("[data-sidebar-inbox]");
     expect(currentInboxPanel().open).toBe(false);
-    await mount(row({ running: false }));
-    expect(document.querySelector("[data-inbox-running]")).toBeNull();
   });
 
   it("is a tile with the same count among the avatars", async () => {
@@ -115,7 +113,7 @@ describe("the Inbox row", () => {
     expect(document.querySelector("[data-inbox-count]")?.textContent).toBe("9+");
   });
 
-  it("counts what a team's person has to fix, except what the inbox lists already", async () => {
+  it("counts inbox requests without adding unrelated team issues", async () => {
     setInboxView(placeView([question]));
     setTeamPeople({ people: [], me: null, admin: true, needsYou: [
       { kind: "signed-out", id: "s", at: AT, instanceId: "claude", botIds: ["eli"] },
@@ -124,13 +122,11 @@ describe("the Inbox row", () => {
       { kind: "message", id: "m", at: AT, botId: "eli", threadId: "t", from: "Ada", text: "An inbox line" },
     ] });
     await mount(row());
-    expect(document.querySelector("[data-inbox-count]")?.textContent).toBe("3");
+    expect(document.querySelector("[data-inbox-count]")?.textContent).toBe("1");
     server.answer = placeView([question]);
     openInbox();
     await mount(createElement(InboxPanel), [bot({})]);
-    expect(document.querySelector("[data-inbox-fixes]")?.textContent).toContain("Eli needs a fix");
-    expect(document.querySelector("[data-inbox-fixes]")?.textContent).toContain("In their own chat");
-    expect(document.querySelector("[data-inbox-fixes]")?.textContent).not.toContain("Which page?");
+    expect(document.querySelector("[data-inbox-fixes]")).toBeNull();
   });
 });
 
@@ -231,21 +227,15 @@ describe("a place's inbox in the panel", () => {
     expect(dispatch.mock.calls.map(([action]) => action.threadId).filter(Boolean).every((threadId) => threadId === "eli-launch"), "nothing opens another of the bot's threads").toBe(true);
   });
 
-  it("lists the conversations at work with a jump to each and the pin, leaving out what the inbox already asks", async () => {
+  it("keeps unrelated active conversations out of the inbox", async () => {
     const working = { threadId: "eli-work", title: "Writing the page", createdAt: 1, busy: true, activity: "working" as const };
     const asking = { threadId: "eli-pricing", title: "Pricing work", createdAt: 2, activity: "waiting-on-you" as const };
     const told = { threadId: "noa-main", title: "Told already", createdAt: 3, unread: true };
     const toldAndWorking = { threadId: "line-thread", title: "Told and still working", createdAt: 4, unread: true, busy: true };
     const lineThere = { ...news, id: "line-t", origin: { botId: "eli", threadId: "line-thread", title: "Told and still working" } };
     await panel([approval, news, lineThere], [bot({ tasks: [working, asking, told, toldAndWorking] as Bot["tasks"] })]);
-    const section = document.querySelector<HTMLElement>("[data-inbox-active]")!;
-    expect(section.textContent).toContain("Writing the page");
-    expect(section.textContent).not.toContain("Pricing work");
-    expect(section.textContent, "unread news is already a line above").not.toContain("Told already");
-    expect(section.textContent, "work still going stays reachable").toContain("Told and still working");
-    await act(async () => { [...section.querySelectorAll<HTMLElement>("button")].find((one) => one.textContent?.includes("Writing the page"))!.click(); });
-    expect(dispatch).toHaveBeenCalledWith({ type: "switchTask", botId: "eli", threadId: "eli-work" });
-    await click("[data-inbox-pin]");
-    expect(document.querySelector("[data-inbox-pin]")!.getAttribute("aria-label")).toBe("Unpin");
+    expect(document.querySelector("[data-inbox-active]")).toBeNull();
+    expect(document.querySelector("[data-inbox-pin]")).toBeNull();
+    expect(document.querySelectorAll("[data-inbox-row]")).toHaveLength(3);
   });
 });

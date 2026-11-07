@@ -17,6 +17,12 @@ describe("a fixture driven from a real browser", () => {
 });
 
 describe("the fixture's fake engine knobs", () => {
+  it("keeps generated labels from overwriting the turn's launch receipt", () => {
+    const env = childEnv({});
+    expect(env.FAKE_CLAUDE_TEXT_DUMP).not.toBe(env.FAKE_CLAUDE_DUMP);
+    expect(childEnv({ FAKE_CLAUDE_TEXT_DUMP: "/tmp/topic-label.json" }).FAKE_CLAUDE_TEXT_DUMP).toBe("/tmp/topic-label.json");
+  });
+
   it("lets the Claude fake's knobs and the Codex fake's background-call knobs cross, and nothing else", () => {
     const env = childEnv({
       FAKE_CLAUDE_TEXT_ROUTES: "/tmp/routes.json", FAKE_CODEX_TEXT_ROUTES: "/tmp/codex-routes.json", FAKE_CODEX_TEXT_LOG: "/tmp/codex.jsonl",

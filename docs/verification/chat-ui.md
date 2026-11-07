@@ -180,6 +180,52 @@ the refusal case replaces only that disposable page's clipboard writer.
 | --- | --- |
 | ![Before at 390px](assets/mobile-code-blocks/before-390.png) | ![After at 390px](assets/mobile-code-blocks/after-390.png) |
 
+## Response components and conversation spacing
+
+Default replies use an open reading surface in both interface modes. Their
+typography, code frames, table presentation, callouts and disclosures adapt
+T3 Code's response presentation; attribution is in `third_party/t3-code/README.md`
+and the repository's NOTICE.
+
+The model's shared reply guidance describes native headings, lists, checklists,
+tables, code, Mermaid, math, file links and images, and when an interactive
+widget or sandboxed HTML reply is appropriate. GitHub callouts support NOTE,
+TIP, IMPORTANT, WARNING and CAUTION. Disclosures use this restricted syntax:
+
+```markdown
+<details>
+<summary>Supporting evidence</summary>
+
+Optional **Markdown** content.
+
+</details>
+```
+
+Only these tags and an optional `open` flag are recognized. Other HTML and
+attributes remain inert. Unclosed disclosures remain
+visible rather than hiding the following answer. A disclosure stays together
+when a conversational reply is split; tables inside it stay inside it.
+
+Conversation rows have a 24px gap, with another 8px before a new user turn.
+Separate bot messages retain space between them, including 12px between parts
+of a conversational reply. Each text response carries the bot's avatar and
+colored name, including consecutive replies in a room. Incoming teammate
+messages in a direct conversation also have a colored border and tinted panel.
+
+```sh
+pnpm exec vitest run src/components/ResponseComponents.test.ts src/components/ChatMarkdown.test.ts src/components/ChatView.conversational.test.ts src/components/ChatView.team.test.ts src/components/GroupView.speaker.test.ts src/components/ToolActivity.full.test.ts src/lib/formatted-reply.test.ts shared/reply-style.test.ts
+pnpm exec vitest run server/system-prompt.test.ts server/drivers/agents-catalog-wire.test.ts server/reply-behaviour.e2e.test.ts
+OMB_UI_E2E=1 pnpm exec vitest run scripts/testing/mobile-code-blocks-ui.e2e.test.ts
+```
+
+The full-app browser recipe uses an isolated fake-engine fixture. It checks a
+callout and keyboard opening of a disclosure in the real transcript, code
+copy/wrap behavior at 320px, 390px, landscape and desktop widths, visible touch
+labels and 44px touch targets. The reply-behavior fixture checks that the
+prompt preview and a real fake-provider turn receive the same reply guidance.
+These checks prove rendering and prompt delivery, not a live model's choice of
+components.
+
 ## Thinking timer across thread switches
 
 `scripts/testing/thinking-timer-ui.e2e.test.ts` holds the working row's
